@@ -22,7 +22,7 @@ pub enum QSystemLLVMPassError {
     ForceOrderError(HugrError),
     /// An error from the component [`ConstantFoldPass`] pass.
     ConstantFoldError(ConstFoldError),
-    /// An error when running [`RemoveDeadFuncsPass`] after monomorphisation.
+    /// An error when running [`RemoveDeadFuncsPass`] after monomorphization.
     DCEError(RemoveDeadFuncsError),
     /// The entrypoint of the HUGR is not a function.
     #[display("Expected the HUGR entrypoint to be a function, but found {entrypoint_optype}.")]
@@ -46,7 +46,7 @@ pub enum QSystemLLVMPassError {
 /// to run after this pass.
 ///
 /// The pass currently requires a global scope, matching the final preparation
-/// behavior of the old `QSystemPass`.
+/// behaviour of the old `QSystemPass`.
 #[derive(Debug, Clone)]
 pub struct QSystemLLVMPass {
     constant_fold: bool,

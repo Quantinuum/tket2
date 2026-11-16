@@ -124,9 +124,9 @@ impl ECCRewriter {
             .map(|id| (&self.targets[id.0]).into())
     }
 
-    /// Serialise a rewriter to an IO stream.
+    /// Serialize a rewriter to an IO stream.
     ///
-    /// Precomputed rewriters can be serialised as binary and then loaded
+    /// Precomputed rewriters can be serialized as binary and then loaded
     /// later using [`ECCRewriter::load_binary_io`].
     #[cfg(feature = "binary-eccs")]
     pub fn save_binary_io<W: io::Write>(
@@ -211,21 +211,21 @@ impl Rewriter for ECCRewriter {
     }
 }
 
-/// Errors that can occur when (de)serialising an [`ECCRewriter`].
+/// Errors that can occur when (de)serializing an [`ECCRewriter`].
 #[derive(Debug, Display, Error, From)]
 #[non_exhaustive]
 pub enum RewriterSerialisationError {
     /// An IO error occurred
     #[display("IO error: {_0}")]
     Io(io::Error),
-    /// An error occurred during deserialisation
+    /// An error occurred during deserialization
     #[display("Deserialisation error: {_0}")]
     Deserialisation(rmp_serde::decode::Error),
-    /// An error occurred during serialisation
+    /// An error occurred during serialization
     #[display("Serialisation error: {_0}")]
     Serialisation(rmp_serde::encode::Error),
     /// An error occurred while resolving the extension ops
-    /// in the deserialised rewrite set.
+    /// in the deserialized rewrite set.
     ExtensionResolutionError(ExtensionResolutionError),
 }
 

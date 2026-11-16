@@ -1,4 +1,4 @@
-//! Rewriting strategies for circuit optimisation.
+//! Rewriting strategies for circuit optimization.
 //!
 //! This module contains the [`RewriteStrategy`] trait, which is currently
 //! implemented by
@@ -11,7 +11,7 @@
 //!    - [`ExhaustiveThresholdStrategy`], which tries every rewrite below
 //!      threshold function.
 //!
-//! The exhaustive strategies are parametrised by a strategy cost function:
+//! The exhaustive strategies are parameterized by a strategy cost function:
 //!    - [`LexicographicCostFunction`] allows rewrites that do
 //!      not increase some coarse cost function (e.g. CX count), whilst
 //!      ordering them according to a lexicographic ordering of finer cost
@@ -34,7 +34,7 @@ use crate::{Circuit, TketOp};
 use super::CircuitRewrite;
 use super::trace::RewriteTrace;
 
-/// Rewriting strategies for circuit optimisation.
+/// Rewriting strategies for circuit optimization.
 ///
 /// A rewrite strategy takes a set of possible rewrites and applies them
 /// to a circuit according to a strategy. It returns a list of new circuits,
@@ -42,9 +42,9 @@ use super::trace::RewriteTrace;
 /// original circuit.
 ///
 /// It also assign every circuit a totally ordered cost that can be used when
-/// using rewrites for circuit optimisation.
+/// using rewrites for circuit optimization.
 pub trait RewriteStrategy {
-    /// The circuit cost to be minimised.
+    /// The circuit cost to be minimized.
     type Cost: CircuitCost;
 
     /// Apply a set of rewrites to a circuit.
@@ -316,7 +316,7 @@ pub trait StrategyCost {
 /// total number of gates as the only fine grained cost function.
 ///
 /// Lexicographic orderings may be useful to add relief to an otherwise flat
-/// optimisation landscape.
+/// optimization landscape.
 #[derive(Debug, Clone)]
 pub struct LexicographicCostFunction<F, const N: usize> {
     cost_fns: [F; N],
@@ -344,7 +344,7 @@ impl LexicographicCostFunction<fn(&OpType) -> usize, 2> {
     /// A fine-grained cost function given by the total number of quantum gates
     /// is used to rank circuits with equal CX count.
     ///
-    /// This is probably a good default for NISQ-y circuit optimisation.
+    /// This is probably a good default for NISQ-y circuit optimization.
     pub fn default_cx_strategy() -> ExhaustiveGreedyStrategy<Self> {
         Self::cx_count().into_greedy_strategy()
     }
@@ -529,6 +529,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_greedy_strategy() {
         let mut circ = n_cx(10);
         let cx_gates = entrypoint_tket_ops(&circ);
@@ -558,6 +559,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_exhaustive_default_strategy() {
         let mut circ = n_cx(10);
         let cx_gates = entrypoint_tket_ops(&circ);
@@ -595,6 +597,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_exhaustive_gamma_strategy() {
         let circ = n_cx(10);
         let cx_gates = entrypoint_tket_ops(&circ);

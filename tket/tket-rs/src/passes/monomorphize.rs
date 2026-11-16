@@ -427,6 +427,7 @@ mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_multiargs_nats() {
         //pf1 contains pf2 contains mono_func -> pf1<a> and pf1<b> share pf2's and they share mono_func
 
@@ -653,6 +654,7 @@ mod test {
     /// Debug info on a polymorphic function and its contained nodes
     /// should be copied to the monomorphized instances.
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_debug_info_copied_by_monomorphization() -> Result<(), Box<dyn std::error::Error>> {
         use hugr_core::hugr::hugrmut::HugrMut;
         use hugr_core::metadata::{LocationRecord, SubprogramRecord};
@@ -779,7 +781,7 @@ mod test {
     #[rstest]
     #[case::bounded_nat(vec![0.into()], "$foo$$n(0)")]
     #[case::type_unit(vec![Type::UNIT.into()], "$foo$$t(Unit)")]
-    #[case::type_int(vec![INT_TYPES[2].clone().into()], "$foo$$e(int(2))")]
+    #[case::type_int(vec![INT_TYPES[2].clone().into()], "$foo$$e(int<2>)")]
     #[case::string(vec!["arg".into()], "$foo$$s(arg)")]
     #[case::dollar_string(vec!["$arg".into()], "$foo$$s(\\$arg)")]
     #[case::sequence(vec![vec![0.into(), Type::UNIT.into()].into()], "$foo$$list($n(0)$t(Unit))")]

@@ -1,7 +1,7 @@
 # Manifests, scripts, and shared fixtures are relative to the repository root.
 set working-directory := '..'
 
-# List tket commands; shared setup, format, fix, and check commands live at the root.
+# List tket commands.
 help:
     @just --list --justfile "{{justfile()}}"
 
@@ -13,17 +13,40 @@ _check_nextest_installed:
 build:
     cd tket/tket-py && uv run maturin build --release
 
-# Run all the tests.
-test: test-rust test-python
-# Run all rust tests.
+# Run tket's Rust and Python tests.
+test: test-rust test-docs test-python
+# Run tket Rust tests; QIS tests run without the Python extension feature.
 [positional-arguments]
 test-rust *TEST_ARGS: _check_nextest_installed
-    uv run cargo nextest r --all-features "$@"
+    uv run cargo nextest r --workspace --exclude 'tk-pg-*' --exclude tket-py --exclude selene-hugr-qis-compiler --all-features "$@"
+    uv run cargo nextest r -p selene-hugr-qis-compiler "$@"
+
+# Run tket's Rust documentation examples.
+test-docs:
+    uv run cargo test --doc --workspace --exclude 'tk-pg-*' --exclude tket-py --exclude selene-hugr-qis-compiler --all-features
+
 # Run all python tests.
 [positional-arguments]
 test-python *TEST_ARGS:
     uv run maturin develop --uv
-    uv run pytest "$@"
+    uv run pytest tket/tket-py tket/tket-exts tket/tket-eccs "$@"
+    uv run --package selene-hugr-qis-compiler pytest tket/qis-compiler "$@"
+
+# Check tket's Rust and Python code.
+check: check-rust check-python
+
+# Check formatting, compilation, lints, and documentation for tket crates.
+check-rust:
+    cargo fmt -p tket -p tket-qsystem -p tket1-passes -p badger-optimiser -p compile-rewriter -p tket-py -p selene-hugr-qis-compiler -- --check
+    uv run cargo check --workspace --exclude 'tk-pg-*' --all-targets --all-features
+    uv run cargo clippy --workspace --exclude 'tk-pg-*' --all-targets --all-features -- -D warnings
+    RUSTDOCFLAGS=-Dwarnings uv run cargo doc --workspace --exclude 'tk-pg-*' --all-features --no-deps
+
+# Check formatting, lints, and types for tket and its supporting scripts.
+check-python:
+    uv run ruff format --check tket scripts test_files
+    uv run ruff check tket scripts test_files
+    uv run --all-extras mypy tket scripts
 
 # Generate a test coverage report.
 coverage: coverage-rust coverage-python

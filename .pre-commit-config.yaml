@@ -39,17 +39,17 @@ repos:
   - repo: local
     hooks:
       - id: ruff-format
-        name: ruff format
+        name: ruff format (tket)
         description: Format python code with `ruff`.
-        entry: uv run ruff format
+        entry: uv run ruff format tket scripts test_files
         language: system
         files: \.py$
         exclude: ^pg-libs/
         pass_filenames: false
       - id: ruff-check
-        name: ruff
+        name: ruff (tket)
         description: Check python code with `ruff`.
-        entry: uv run ruff check --fix --exit-non-zero-on-fix
+        entry: uv run ruff check --fix --exit-non-zero-on-fix tket scripts test_files
         language: system
         files: \.py$
         exclude: ^pg-libs/
@@ -57,7 +57,7 @@ repos:
       - id: mypy-check-tket
         name: mypy (tket)
         description: Check tket Python code with `mypy`.
-        entry: uv run --all-extras mypy .
+        entry: uv run --all-extras mypy tket scripts
         language: system
         files: \.py$
         exclude: ^pg-libs/
@@ -65,44 +65,44 @@ repos:
       - id: cargo-fmt
         name: cargo format
         description: Format rust code with `cargo fmt`.
-        entry: uv run -- cargo fmt --all -- --check
+        entry: cargo fmt --all -- --check
         language: system
         files: \.rs$
         exclude: ^pg-libs/
         pass_filenames: false
       - id: cargo-check
-        name: cargo check
+        name: cargo check (tket)
         description: Check rust code with `cargo check`.
-        entry: env RUSTFLAGS="-Dwarnings" uv run -- cargo check --all --all-features --workspace
+        entry: env RUSTFLAGS="-Dwarnings" uv run -- cargo check --all --all-features --workspace --exclude 'tk-pg-*'
         language: system
         files: \.rs$
         exclude: ^pg-libs/
         pass_filenames: false
       - id: cargo-test
-        name: cargo nextest r
+        name: cargo nextest r (tket)
         description: Run tests with `cargo nextest r`.
-        entry: uv run -- cargo nextest r --all-features
+        entry: just tket/test-rust
         language: system
         files: \.rs$
         exclude: ^pg-libs/
         pass_filenames: false
       - id: cargo-clippy
-        name: cargo clippy
+        name: cargo clippy (tket)
         description: Run clippy lints with `cargo clippy`.
-        entry: uv run -- cargo clippy --all-features --all-targets --workspace -- -D warnings
+        entry: uv run -- cargo clippy --all-features --all-targets --workspace --exclude 'tk-pg-*' -- -D warnings
         language: system
         files: \.rs$
         exclude: ^pg-libs/
         pass_filenames: false
       - id: cargo-doc
-        name: cargo doc
+        name: cargo doc (tket)
         description: Generate documentation with `cargo doc`.
-        entry: uv run -- cargo doc --no-deps --all-features --workspace
+        entry: uv run -- cargo doc --no-deps --all-features --workspace --exclude 'tk-pg-*'
         language: system
         files: \.rs$
         exclude: ^pg-libs/
         pass_filenames: false
-      # pg-libs hooks (separate Cargo/uv workspace)
+      # pg-libs hooks (scoped to the pg-libs crates and Python tools)
       - id: ruff-format-pg-libs
         name: ruff format (pg-libs)
         description: Format pg-libs python code with `ruff`.
@@ -120,44 +120,42 @@ repos:
       - id: mypy-check-pg-libs
         name: mypy (pg-libs)
         description: Check pg-libs Python code with `mypy`.
-        entry: sh -c "cd pg-libs && env -u UV_PROJECT_ENVIRONMENT -u VIRTUAL_ENV uv run mypy ."
+        entry: sh -c "cd pg-libs && uv run --only-group pg-libs mypy ."
         language: system
         files: ^pg-libs/.*\.py$
         pass_filenames: false
       - id: cargo-fmt-pg-libs
         name: cargo format (pg-libs)
         description: Format pg-libs rust code with `cargo fmt`.
-        entry: sh -c "cd pg-libs && cargo fmt --all -- --check"
+        entry: cargo fmt --all -- --check
         language: system
         files: ^pg-libs/.*\.rs$
         pass_filenames: false
       - id: cargo-check-pg-libs
         name: cargo check (pg-libs)
         description: Check pg-libs rust code with `cargo check`.
-        entry: sh -c "cd pg-libs && env RUSTFLAGS='-Dwarnings' cargo check --workspace"
+        entry: sh -c "cd pg-libs && env RUSTFLAGS='-Dwarnings' cargo check -p 'tk-pg-*'"
         language: system
         files: ^pg-libs/.*\.rs$
         pass_filenames: false
       - id: cargo-clippy-pg-libs
         name: cargo clippy (pg-libs)
         description: Run clippy lints on pg-libs with `cargo clippy`.
-        entry: sh -c "cd pg-libs && cargo clippy --all-targets --workspace -- -D warnings"
+        entry: sh -c "cd pg-libs && cargo clippy --all-targets -p 'tk-pg-*' -- -D warnings"
         language: system
         files: ^pg-libs/.*\.rs$
         pass_filenames: false
       - id: cargo-test-pg-libs
         name: cargo nextest r (pg-libs)
         description: Run pg-libs tests with `cargo nextest r`.
-        # cd into pg-libs so Cargo picks up pg-libs/.cargo/config.toml.
-        entry: sh -c "cd pg-libs && cargo nextest r"
+        entry: sh -c "cd pg-libs && uv run --only-group pg-libs cargo nextest r -p 'tk-pg-*'"
         language: system
         files: ^pg-libs/.*\.rs$
         pass_filenames: false
       - id: py-test
-        name: pytest
+        name: pytest (tket)
         description: Run python tests
-        # Ensure that we are using the local version of `tket-eccs` and not the one from PyPI
-        entry: uv run -- sh -c "maturin develop && pytest --cov=./ --cov-report=html"
+        entry: just tket/test-python
         language: system
         files: \.py$
         exclude: ^pg-libs/

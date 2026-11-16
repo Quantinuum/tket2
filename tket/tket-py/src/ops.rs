@@ -1,4 +1,4 @@
-//! Bindings for rust-defined operations
+//! Bindings for rust-defined operations.
 
 use derive_more::{From, Into};
 use hugr::{extension::simple_op::MakeExtensionOp, ops::custom::ExtensionOp};

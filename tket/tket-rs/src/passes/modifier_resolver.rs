@@ -2,7 +2,7 @@
 //!
 //! Solved original function nodes may be removed after resolution when they
 //! are no longer needed and the configured pass scope allows removing them.
-use crate::modifier::modifier_resolver::resolve_modifier_with_entrypoints_and_scope;
+use crate::modifier::modifier_resolver::resolve_modifier;
 use crate::passes::{ComposablePass, PassScope, WithScope};
 use hugr::Node;
 use hugr::hugr::hugrmut::HugrMut;
@@ -10,6 +10,8 @@ use hugr::hugr::hugrmut::HugrMut;
 pub use crate::modifier::modifier_resolver::ModifierResolverErrors;
 
 /// A pass to resolve modifiers (control/dagger/power) in a Hugr.
+///
+/// Uses [`resolve_modifier`] to select traversal roots from the configured scope.
 ///
 /// Solved original function nodes may be removed after resolution when they
 /// are no longer needed and [`PassScope::in_scope`] allows them to be modified
@@ -34,9 +36,6 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for ModifierResolverPass {
     type Result = ();
 
     fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
-        let Some(root) = self.scope.root(hugr) else {
-            return Ok(());
-        };
-        resolve_modifier_with_entrypoints_and_scope(hugr, [root], &self.scope)
+        resolve_modifier(hugr, &self.scope)
     }
 }

@@ -1,4 +1,4 @@
-//! Optimisation passes and related utilities for HUGR programs.
+//! Optimization passes and related utilities for HUGR programs.
 
 /// Compiler passes and utilities for composing them.
 pub mod composable;
@@ -13,6 +13,11 @@ pub use borrow_squash::BorrowSquashPass;
 // Greedy gate commutation on quantum circuits.
 pub mod commutation;
 pub use commutation::apply_greedy_commutation;
+
+pub mod pauli_graph_resynthesis;
+pub use pauli_graph_resynthesis::PauliGraphResynthesis;
+
+pub mod pg_convert;
 
 // Constant folding pass.
 pub mod const_fold;

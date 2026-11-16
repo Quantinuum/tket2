@@ -1,8 +1,8 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#     "guppylang==1.0.0a5",
-#     "guppylang-internals==1.0.0a5",
+#     "guppylang==1.2.0",
+#     "guppylang-internals==1.2.0",
 #     "tket",
 #     "pytket >=2.1.0,<3",
 # ]
@@ -261,7 +261,8 @@ def simple_modifier() -> bytes:
         result("c0", measure(q0).read())
         result("c1", measure(q1).read())
 
-    return main.compile().to_bytes()
+    # Do not run ResolveModifiersPass, we want to see the Hugr first
+    return main.with_minimal_opt().compile().to_bytes()
 
 
 if __name__ == "__main__":

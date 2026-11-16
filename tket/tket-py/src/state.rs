@@ -1,7 +1,7 @@
 //! Program state definition.
 //!
 //! This module defines [`CompilationState`], a wrapper around a rust-defined
-//! [`hugr::Hugr`] that is optimised for compilation and rewriting.
+//! [`hugr::Hugr`] that is optimized for compilation and rewriting.
 
 mod base;
 mod cost;

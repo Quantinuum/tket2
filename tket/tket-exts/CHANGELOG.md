@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.3](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.14.2...tket-exts-v0.14.3) (2026-09-17)
+
+
+### Features
+
+* Add pauli_exp extension ([#1996](https://github.com/Quantinuum/tket2/issues/1996)) ([d7d0bd3](https://github.com/Quantinuum/tket2/commit/d7d0bd3739ab903fa0bb9b97f8de12ed3cf4daae))
+
 ## [0.14.2](https://github.com/Quantinuum/tket2/compare/tket-exts-v0.14.1...tket-exts-v0.14.2) (2026-09-04)
 
 

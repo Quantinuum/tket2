@@ -599,6 +599,7 @@ mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn all_ops() {
         let hugr = {
             let mut func_builder = FunctionBuilder::new(

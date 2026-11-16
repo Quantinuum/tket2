@@ -141,7 +141,7 @@ impl TKETDecode for SerialCircuit {
     ) -> Result<Node, Self::DecodeError> {
         let mut decoder = PytketDecoderContext::new(self, hugr, target, options, None)?;
         decoder.run_decoder(&self.commands)?;
-        Ok(decoder.finish(None)?.node())
+        Ok(decoder.finish::<Node>(None)?.node())
     }
 
     fn encode<H: HugrView>(

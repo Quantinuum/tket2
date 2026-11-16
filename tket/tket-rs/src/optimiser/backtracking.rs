@@ -1,4 +1,4 @@
-//! A backtracking optimiser.
+//! A backtracking optimizer.
 //!
 //! Will greedily explore the best states in the search space, and backtrack
 //! when a state is found that is worse than the best state in the queue.
@@ -10,7 +10,7 @@ use crate::optimiser::{
     pqueue::Entry,
 };
 
-/// A single-threaded backtracking optimiser.
+/// A single-threaded backtracking optimizer.
 ///
 /// Will greedily explore the best states in the search space, and backtrack
 /// when a state is found that is worse than the best state in the queue.
@@ -20,18 +20,18 @@ pub struct BacktrackingOptimiser {
     ///
     /// Defaults to `20`.
     pub queue_size: usize,
-    /// The maximum time (in seconds) to run the optimiser.
+    /// The maximum time (in seconds) to run the optimizer.
     ///
     /// Defaults to `None`, which means no timeout.
     pub timeout: Option<u64>,
     /// The maximum time (in seconds) to search for new improvements to the
-    /// best state. If no progress is made in this time, the optimiser will
+    /// best state. If no progress is made in this time, the optimizer will
     /// stop.
     ///
     /// Defaults to `None`, which means no timeout.
     pub progress_timeout: Option<u64>,
     /// The maximum number of states to process before stopping the
-    /// optimisation.
+    /// optimization.
     ///
     /// Defaults to `None`, which means no limit.
     pub max_visited_count: Option<usize>,

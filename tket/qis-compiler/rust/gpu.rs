@@ -125,7 +125,7 @@ impl GpuCodegen {
     /// message from the GPU library - which might contain verbose information
     /// pertinent to the failure.
     ///
-    /// As such we utilise the verify_gpu_call helper to emit a panic directly
+    /// As such we utilize the verify_gpu_call helper to emit a panic directly
     /// via selene's panic_str function, which can handle c strings.
     fn emit_get_context<'c, H: HugrView<Node = Node>>(
         &self,
@@ -678,7 +678,7 @@ fn emit_api_validation<'c, H: HugrView<Node = Node>>(
 /// we emit a panic with the error message from the library.
 /// If no error message is available, we use a default message.
 ///
-/// Utilises the selene panic_str function to emit the panic,
+/// Utilizes the selene panic_str function to emit the panic,
 /// rather than the size-restricted QIS panic.
 fn emit_panic_with_gpu_error<'c, H: HugrView<Node = Node>>(
     ctx: &EmitFuncContext<'c, '_, H>,

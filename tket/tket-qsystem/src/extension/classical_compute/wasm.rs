@@ -82,7 +82,7 @@ pub use super::{
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-/// The type used to parameterise Compute operations for the wasm extension.
+/// The type used to parameterize Compute operations for the wasm extension.
 pub struct WasmExtension;
 
 /// Concrete instantiation(i.e. with type args applied) of a "tket.wasm" operation.
@@ -318,6 +318,7 @@ mod test {
     #[rstest]
     #[case(type_row![], type_row![])]
     #[case(vec![Type::UNIT], TypeRow::try_from(Term::from(vec![TypeArg::from(Type::UNIT),TypeArg::from(usize_t())])).unwrap())]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn build_all(#[case] in_types: impl Into<TypeRow>, #[case] out_types: impl Into<TypeRow>) {
         use hugr::{
             builder::DataflowHugr as _,

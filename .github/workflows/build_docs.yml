@@ -58,7 +58,7 @@ jobs:
 
       - name: Run the docs build
         run: |
-          just build-pydocs
+          just tket/build-pydocs
 
       - name: Upload artifact.
         uses: actions/upload-pages-artifact@v5

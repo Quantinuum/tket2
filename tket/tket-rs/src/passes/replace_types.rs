@@ -2,21 +2,23 @@
 //! Replace types with other types across the Hugr. See [`ReplaceTypes`] and [Linearizer].
 //!
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use handlers::list_const;
 use hugr_core::hugr::linking::{HugrLinking, NameLinkingPolicy, OnMultiDefn};
 use hugr_core::std_extensions::collections::array::array_type_def;
 use hugr_core::std_extensions::collections::list::list_type_def;
+use indexmap::IndexSet;
 use itertools::Either;
 use thiserror::Error;
 
 use hugr_core::builder::{
-    BuildError, BuildHandle, Container, Dataflow, DataflowHugr, FunctionBuilder, HugrBuilder,
+    BuildError, BuildHandle, Container, Dataflow, DataflowHugr, FunctionBuilder,
 };
 use hugr_core::extension::{ExtensionId, OpDef, SignatureError, TypeDef};
 use hugr_core::hugr::hugrmut::HugrMut;
+use hugr_core::hugr::internal::HugrMutInternals;
 use hugr_core::ops::constant::{OpaqueValue, Sum};
 use hugr_core::ops::handle::{DataflowOpID, FuncID, NodeHandle};
 use hugr_core::ops::{
@@ -36,6 +38,14 @@ pub use linearize::{CallbackHandler, DelegatingLinearizer, LinearizeError, Linea
 
 pub mod metadata;
 pub use metadata::MetadataPropagationPolicy;
+
+/// Reserve an unused function symbol.
+pub(crate) fn reserve_function_name(base: &str, occupied: &mut HashSet<String>) -> String {
+    std::iter::once(base.to_owned())
+        .chain((1_u64..).map(|i| format!("{base}${i}")))
+        .find(|name| occupied.insert(name.clone()))
+        .unwrap()
+}
 
 /// A recipe for creating a dataflow Node - as a new child of a [`DataflowParent`]
 /// or in order to replace an existing node.
@@ -74,10 +84,11 @@ impl NodeTemplate {
     }
 
     /// Creates a [`NodeTemplate::LinkedHugr`] creating a call node to the given
-    /// function definition or declaration.
+    /// function definition or declaration, including its reachable dependencies.
     ///
     /// Returns a [`BuildError::UnexpectedType`] if the given Hugr does not have
     /// a function definition or declaration as entrypoint.
+    /// Linker errors are returned if dependencies cannot be imported.
     pub fn call_to_function(
         func_def: Hugr,
         type_args: &[TypeArg],
@@ -98,9 +109,10 @@ impl NodeTemplate {
 
         // Build a new hugr and insert the function definition into it
         let mut b = FunctionBuilder::new_vis("", func_signature, Visibility::Private).unwrap();
+        let module_root = b.hugr().module_root();
         let func_id = FuncID::<true>::from(
-            b.module_root_builder()
-                .add_hugr(func_def)
+            b.hugr_mut()
+                .insert_link_hugr(module_root, func_def, &NameLinkingPolicy::default())?
                 .inserted_entrypoint,
         );
 
@@ -301,9 +313,9 @@ impl ReplacementOptions {
 /// The struct configures what types, ops, and constants should be replaced with what,
 /// and may be applied to a Hugr via [`Self::run`].
 ///
-/// Parametrized types and ops will be reparameterized taking into account the
+/// Parameterized types and ops will be reparameterized taking into account the
 /// replacements, but any ops taking/returning the replaced types *not* as a result of
-/// parametrization, will also need to be replaced - see [`Self::set_replace_op`].
+/// parameterization, will also need to be replaced - see [`Self::set_replace_op`].
 /// Similarly [Const]s.
 ///
 /// Types that are [Copyable](hugr_core::types::TypeBound::Copyable) may also be replaced
@@ -332,6 +344,7 @@ pub struct ReplaceTypes {
         HashMap<ParametricType, (Arc<dyn Fn(&[TypeArg]) -> Option<Type>>, ReplacementOptions)>,
     linearize: DelegatingLinearizer,
     op_map: HashMap<OpHashWrapper, (NodeTemplate, ReplacementOptions)>,
+    generated_ops: IndexSet<OpHashWrapper>,
     param_ops: HashMap<
         ParametricOp,
         (
@@ -418,6 +431,7 @@ impl ReplaceTypes {
             param_types: Default::default(),
             linearize: DelegatingLinearizer::new_empty(),
             op_map: Default::default(),
+            generated_ops: Default::default(),
             param_ops: Default::default(),
             consts: Default::default(),
             param_consts: Default::default(),
@@ -435,7 +449,7 @@ impl ReplaceTypes {
     /// the first type, must be handled by two separate [ReplaceTypes]'s via a temporary
     /// type. )
     ///
-    /// Note that if `src` is an instance of a *parametrized* [`TypeDef`], this takes
+    /// Note that if `src` is an instance of a *parameterized* [`TypeDef`], this takes
     /// precedence over [`Self::set_replace_parametrized_type`] where the `src`s overlap. Thus, this
     /// should only be used on already-*[monomorphize](crate::passes::MonomorphizePass)d* Hugrs, as
     /// substitution (parametric polymorphism) happening later will not respect this replacement.
@@ -455,7 +469,7 @@ impl ReplaceTypes {
             .insert(src, (dest, ReplacementOptions::recursive()));
     }
 
-    /// Configures this instance to change occurrences of a parametrized type `src`
+    /// Configures this instance to change occurrences of a parameterized type `src`
     /// via a callback that builds the replacement type given the [`TypeArg`]s.
     ///
     /// Note that the `TypeArgs` will already have been updated (e.g. they may not
@@ -518,7 +532,7 @@ impl ReplaceTypes {
     }
 
     /// Returns a mutable reference to the metadata propagation policy, for
-    /// incremental customisation (e.g. adding rules to the default policy).
+    /// incremental customization (e.g. adding rules to the default policy).
     pub fn metadata_policy_mut(&mut self) -> &mut MetadataPropagationPolicy {
         &mut self.meta_policy
     }
@@ -530,19 +544,80 @@ impl ReplaceTypes {
     /// instance of the same op, must be handled by two separate [ReplaceTypes]'s
     /// via a temporary op.)
     ///
-    /// Note that if `src` is an instance of a *parametrized* [`OpDef`], this takes
+    /// Note that if `src` is an instance of a *parameterized* [`OpDef`], this takes
     /// precedence over [`Self::set_replace_parametrized_op`] where the `src`s overlap.
     /// Thus, this method should only be used for already-*[monomorphize](crate::passes::MonomorphizePass)d*
     /// Hugrs, as substitution (parametric polymorphism) happening later will not respect
     /// this replacement.
     pub fn set_replace_op(&mut self, src: &ExtensionOp, dest: NodeTemplate) {
-        self.op_map.insert(
-            OpHashWrapper::from(src),
-            (dest, ReplacementOptions::recursive()),
-        );
+        let key = OpHashWrapper::from(src);
+        self.generated_ops.swap_remove(&key);
+        self.op_map
+            .insert(key, (dest, ReplacementOptions::recursive()));
     }
 
-    /// Configures this instance to change occurrences of a parametrized op `src`
+    /// Register a [`NodeTemplate::call_to_function`] template whose public definitions
+    /// are owned by this lowerer. Other template kinds do not link helper definitions.
+    pub(crate) fn set_replace_generated_op(&mut self, src: &ExtensionOp, dest: NodeTemplate) {
+        assert!(matches!(dest, NodeTemplate::LinkedHugr(..)));
+        self.set_replace_op(src, dest);
+        self.generated_ops.insert(src.into());
+    }
+
+    /// Reserve declarations, renaming conflicting definitions in generated templates.
+    pub(crate) fn reserve_function_declarations(
+        &mut self,
+        hugr: &impl HugrView<Node = Node>,
+        declarations: &HashSet<String>,
+    ) -> HashSet<String> {
+        let mut occupied = self.reserved_function_names(hugr);
+        if declarations.is_empty() {
+            return occupied;
+        }
+        occupied.extend(declarations.iter().cloned());
+        for key in &self.generated_ops {
+            let Some((NodeTemplate::LinkedHugr(h, _), _)) = self.op_map.get_mut(key) else {
+                unreachable!("generated operations must have registered LinkedHugr templates");
+            };
+            for node in h.children(h.module_root()).collect::<Vec<_>>() {
+                if let OpType::FuncDefn(f) = h.optype_mut(node)
+                    && f.visibility() == &Visibility::Public
+                    && declarations.contains(f.func_name())
+                {
+                    *f.func_name_mut() = reserve_function_name(f.func_name(), &mut occupied);
+                }
+            }
+        }
+        occupied
+    }
+
+    /// Collect module-level function symbols from the target and registered
+    /// templates, including private functions and declarations.
+    fn reserved_function_names(&self, hugr: &impl HugrView<Node = Node>) -> HashSet<String> {
+        fn function_names(h: &impl HugrView<Node = Node>) -> impl Iterator<Item = &str> {
+            h.children(h.module_root())
+                .filter_map(|n| match h.get_optype(n) {
+                    OpType::FuncDefn(f) => Some(f.func_name().as_str()),
+                    OpType::FuncDecl(f) => Some(f.func_name().as_str()),
+                    _ => None,
+                })
+        }
+        function_names(hugr)
+            .chain(self.op_map.values().flat_map(|(template, _)| {
+                match template {
+                    NodeTemplate::LinkedHugr(h, _) | NodeTemplate::CompoundOp(h) => {
+                        Some(h.as_ref())
+                    }
+                    NodeTemplate::SingleOp(_) => None,
+                }
+                .into_iter()
+                .flat_map(function_names)
+            }))
+            .map(str::to_owned)
+            .collect()
+    }
+
+    /// Configures this instance to change occurrences of a parameterized op `src`
     /// via a callback that builds the replacement type given the [`TypeArg`]s.
     /// Note that the `TypeArgs` will already have been updated (e.g. they may not
     /// fit the bounds of the original op); and the returned [NodeTemplate] will be
@@ -566,7 +641,7 @@ impl ReplaceTypes {
     /// Configures this instance to change [Const]s of type `src_ty`, using
     /// a callback that is passed the value of the constant (of that type).
     ///
-    /// Note that if `src_ty` is an instance of a *parametrized* [`TypeDef`],
+    /// Note that if `src_ty` is an instance of a *parameterized* [`TypeDef`],
     /// this takes precedence over [`Self::replace_consts_parametrized`] where
     /// the `src_ty`s overlap.
     pub fn replace_consts(
@@ -578,7 +653,7 @@ impl ReplaceTypes {
     }
 
     /// Configures this instance to change [Const]s of all types that are instances
-    /// of a parametrized typedef `src_ty`, using a callback that is passed the
+    /// of a parameterized typedef `src_ty`, using a callback that is passed the
     /// value of the constant (the [`OpaqueValue`] contains the [`TypeArg`]s). The
     /// callback may return `None` to indicate no change to the constant.
     pub fn replace_consts_parametrized(
@@ -1244,6 +1319,7 @@ pub(super) mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn partial_replace() {
         let e = Extension::new_arc(
             IdentList::new_unchecked("NoBoundsCheck"),

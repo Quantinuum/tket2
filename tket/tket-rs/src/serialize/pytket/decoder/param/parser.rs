@@ -193,8 +193,9 @@ fn parse_term(pair: Pair<'_, Rule>) -> PytketParam<'_> {
             param_ty: FloatHalfTurns,
         },
         Rule::function_call => parse_function_call(pair),
-        Rule::ident => PytketParam::InputVariable {
-            name: pair.as_str(),
+        Rule::ident => match pair.as_str() {
+            "pi" => PytketParam::Constant(std::f64::consts::PI),
+            name => PytketParam::InputVariable { name },
         },
         rule => unreachable!("Term::parse expected a term, found {:?}", rule),
     }
@@ -249,6 +250,7 @@ mod test {
     #[case::exp("42e4", PytketParam::Constant(42e4))]
     #[case::neg("-42.55", PytketParam::Constant(-42.55))]
     #[case::parens("(42)", PytketParam::Constant(42.))]
+    #[case::pi("pi", PytketParam::Constant(std::f64::consts::PI))]
     #[case::var("f64", PytketParam::InputVariable{name: "f64"})]
     #[case::add("42 + f64", PytketParam::Operation {
         op: RotationOp::radd.into(),
@@ -356,7 +358,7 @@ mod test {
     #[rstest]
     #[case::constant("42", &[])]
     #[case::variable("p0", &["p0"])]
-    #[case::nested("2 * (p0 + p1 + pi)", &["p0", "p1", "pi"])]
+    #[case::nested("2 * (p0 + p1 + pi)", &["p0", "p1"])]
     #[case::opaque_sympy("unknown_op(p0)", &[])]
     fn visit_input_variables(#[case] param: &str, #[case] expected: &[&str]) {
         let parsed = PytketParam::parse(param);

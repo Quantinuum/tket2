@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#    "guppylang==1.0.0rc1",
+#    "guppylang==1.1.1",
 # ]
 # ///
 """Some simple nested higher order functions inside modifiers"""
@@ -9,7 +9,7 @@
 from pathlib import Path
 from sys import argv
 
-from guppylang import enable_experimental_features, guppy
+from guppylang import guppy
 from guppylang.std.builtins import (
     Unitary,
     control,
@@ -17,8 +17,6 @@ from guppylang.std.builtins import (
 )
 from guppylang.std.debug import state_result
 from guppylang.std.quantum import discard, h, qubit, s, x
-
-enable_experimental_features()
 
 
 @guppy(unitary=True)
@@ -37,9 +35,22 @@ def apply2(f: Unitary[[qubit], None], q: qubit) -> None:
 
 
 @guppy(controllable=True)
+def recursive_apply_1(f: Unitary[[qubit], None], q: qubit, n: int) -> None:
+    if n == 0:
+        apply(f, q)
+    else:
+        recursive_apply_2(f, q, n)
+
+
+@guppy(controllable=True)
+def recursive_apply_2(f: Unitary[[qubit], None], q: qubit, n: int) -> None:
+    recursive_apply_1(f, q, n - 1)
+
+
+@guppy(controllable=True)
 def apply_if(f: Unitary[[qubit], None], q: qubit, b: bool) -> None:
     if b:
-        apply(f, q)
+        recursive_apply_1(f, q, 3)
 
 
 @guppy

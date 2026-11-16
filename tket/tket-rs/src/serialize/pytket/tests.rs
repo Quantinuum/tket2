@@ -1,5 +1,7 @@
 //! General tests.
 
+mod nonlocal;
+
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::io::BufReader;
@@ -353,6 +355,31 @@ fn circ_preset_bits() -> Hugr {
     );
 
     hugr
+}
+
+/// A classical opaque subgraph with shared inputs and two distinct outputs.
+#[fixture]
+fn circ_opaque_repeated_bit_inputs() -> Hugr {
+    let mut h = FunctionBuilder::new(
+        "opaque_repeated_bit_inputs",
+        Signature::new(vec![qb_t()], vec![qb_t(), bool_t(), bool_t()]),
+    )
+    .unwrap();
+
+    // Extra quantum op to ensure this circuit gets encoded.
+    let [q] = h.input_wires_arr();
+    let [q] = h.add_dataflow_op(TketOp::H, [q]).unwrap().outputs_arr();
+
+    let input = h.add_load_value(Value::true_val());
+    let [same] = h
+        .add_dataflow_op(LogicOp::And, [input, input])
+        .unwrap()
+        .outputs_arr();
+    let [opposite] = h
+        .add_dataflow_op(LogicOp::Not, [same])
+        .unwrap()
+        .outputs_arr();
+    h.finish_hugr_with_outputs([q, same, opposite]).unwrap()
 }
 
 /// A simple circuit with some input parameters
@@ -1462,7 +1489,7 @@ impl CircuitRoundtripTestConfig {
     }
 }
 
-/// Test the standalone serialisation roundtrip from a tket circuit.
+/// Test the standalone serialization roundtrip from a tket circuit.
 ///
 /// This is not a pure roundtrip as the encoder may add internal qubits/bits to
 /// the circuit.
@@ -1582,6 +1609,7 @@ fn fail_on_modified_hugr(circ_tk1_ops: Hugr) {
 /// Parameters produced by opaque barriers remain data dependencies even though
 /// pytket only sees independent commands on separate qubit registers.
 #[rstest]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 fn decode_parameter_used_before_opaque_barrier(circ_reordered_opaque_parameter: Hugr) {
     let mut encoded = EncodedCircuit::new(
         &circ_reordered_opaque_parameter,
@@ -1603,58 +1631,83 @@ fn decode_parameter_used_before_opaque_barrier(circ_reordered_opaque_parameter: 
     decoded.validate().unwrap();
 }
 
-/// Test the serialisation roundtrip from a tket circuit into an EncodedCircuit and back.
+/// Test the serialization roundtrip from a tket circuit into an EncodedCircuit and back.
 #[rstest]
 #[case::preset_qubits(circ_preset_qubits(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::preset_parameterized(circ_parameterized(), 1, CircuitRoundtripTestConfig::Default)]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 #[case::nested_dfgs(circ_nested_dfgs(), 2, CircuitRoundtripTestConfig::Default)]
 #[case::flat_opaque(circ_tk1_ops(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::unsupported_subtree(circ_unsupported_subtree(), 0, CircuitRoundtripTestConfig::Default)]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 #[case::global_defs(circ_global_defs(), 1, CircuitRoundtripTestConfig::Default)]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 #[case::recursive(circ_recursive(), 1, CircuitRoundtripTestConfig::Default)]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 #[case::independent_subgraph(circ_independent_subgraph(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::unsupported_io_wire(circ_unsupported_io_wire(), 1, CircuitRoundtripTestConfig::Default)]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 #[case::order_edge(circ_order_edge(), 1, CircuitRoundtripTestConfig::Default)]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 #[case::complex_param_type(circ_complex_param_type(), 1, CircuitRoundtripTestConfig::Default)]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 #[case::opaque_qubit_tuple_output(
     circ_opaque_qubit_tuple_output(),
     1,
     CircuitRoundtripTestConfig::Default
 )]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 #[case::consumed_qubit_tuple(circ_consumed_qubit_tuple(), 1, CircuitRoundtripTestConfig::Default)]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 #[case::unsupported_subgraph_skipped_output_before_param(
     circ_unsupported_subgraph_skipped_output_before_param(),
     1,
     CircuitRoundtripTestConfig::Default
 )]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 #[case::unsupported_extras_in_circ_box(
     circ_unsupported_extras_in_circ_box(),
     2,
     CircuitRoundtripTestConfig::Default
 )]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 #[case::output_parameter_wire(circ_output_parameter_wire(), 1, CircuitRoundtripTestConfig::Default)]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 #[case::external_float_symbol(circ_external_float_symbol(), 1, CircuitRoundtripTestConfig::Default)]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 #[case::non_local(circ_non_local(), 2, CircuitRoundtripTestConfig::Default)]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 #[case::unsupported_subgraph_no_registers(
     circ_unsupported_subgraph_no_registers(),
     1,
     CircuitRoundtripTestConfig::Default
 )]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 #[case::forward_opaque_parameter(
     circ_forward_opaque_parameter(),
     1,
     CircuitRoundtripTestConfig::Default
 )]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 #[case::mid_circuit_external_subgraph(
     circ_mid_circuit_external_subgraph(),
     2,
     CircuitRoundtripTestConfig::Default
 )]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 #[case::discard_first_qubit(circ_discard_first_qubit(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::measure_and_read(circ_measure_and_read(), 1, CircuitRoundtripTestConfig::Default)]
 #[case::meas_ancilla(circ_measure_ancilla(), 1, CircuitRoundtripTestConfig::Default)]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 #[case::preset_bits(circ_preset_bits(), 1, CircuitRoundtripTestConfig::Default)]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 #[case::read_fanout(circ_cfg_read_fanout(), 2, CircuitRoundtripTestConfig::Default)]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
+#[case::repeated_bit_inputs(
+    circ_opaque_repeated_bit_inputs(),
+    1,
+    CircuitRoundtripTestConfig::Default
+)]
 
 fn encoded_circuit_roundtrip(
     #[case] hugr: Hugr,
@@ -1701,6 +1754,7 @@ fn encoded_circuit_roundtrip(
 /// Segment-local implicit permutations must be visible to subsequent
 /// segments, while the final permutation still determines region outputs.
 #[rstest]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 fn segmented_circuit_tracks_implicit_permutations() {
     let hugr = circ_mid_circuit_external_subgraph();
     let mut encoded =
@@ -1860,7 +1914,7 @@ fn segmented_circuit_rejects_standalone_encoding() {
     assert!(error.to_string().contains("register-free opaque subgraphs"));
 }
 
-/// Test serialisation of circuits with a symbolic expression.
+/// Test serialization of circuits with a symbolic expression.
 ///
 /// Note: this is not a proper roundtrip as the symbols f0 and f1 are not
 /// converted back to circuit inputs. This would require parsing symbolic
@@ -2026,6 +2080,7 @@ fn serial_decode_missing_output_bit_returns_decode_error() {
 /// Regression test for a mismatched signature error found in
 /// <https://github.com/Quantinuum/tket2/pull/1558>
 #[rstest]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 fn standalone_reassemble_preserves_repeated_bit_outputs(circ_preset_bits: Hugr) {
     let circ_signature = circ_preset_bits
         .entrypoint_optype()
@@ -2060,4 +2115,38 @@ fn standalone_reassemble_preserves_repeated_bit_outputs(circ_preset_bits: Hugr) 
         .expect("Function definition")
         .into_owned();
     assert_eq!(&circ_signature.output, &reassembled_signature.output);
+}
+
+/// Reassembling an opaque subgraph must keep its distinct classical results
+/// even when it receives the same bit on multiple input ports.
+///
+/// Regression test for <https://github.com/Quantinuum/guppylang/issues/2383>
+#[rstest]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
+fn opaque_repeated_bit_inputs_preserve_outputs(circ_opaque_repeated_bit_inputs: Hugr) {
+    let mut decoded = circ_opaque_repeated_bit_inputs;
+    let options = EncodeOptions::new().with_subcircuits(true);
+    let encoded = EncodedCircuit::new(&decoded, options).unwrap();
+    let barrier = encoded
+        .iter()
+        .flat_map(|(_, circuit)| &circuit.commands)
+        .find(|command| command.op.op_type == optype::OpType::Barrier)
+        .unwrap();
+    assert_eq!(barrier.args.len(), 4);
+    // Shared inputs are reads, but fresh outputs must be writes so pytket
+    // preserves their dependencies on later consumers.
+    // Regression: https://github.com/Quantinuum/guppylang/issues/2423.
+    assert_eq!(
+        barrier.op.signature.as_ref().unwrap(),
+        &["B", "B", "C", "C"]
+    );
+    assert_ne!(barrier.args[2], barrier.args[3]);
+    encoded.reassemble_inplace(&mut decoded, None).unwrap();
+    decoded.validate().unwrap();
+
+    let output = decoded.get_io(decoded.entrypoint()).unwrap()[1];
+    let first = decoded.single_linked_output(output, 1).unwrap().0;
+    let second = decoded.single_linked_output(output, 2).unwrap().0;
+    assert_eq!(decoded.get_optype(first), &OpType::from(LogicOp::And));
+    assert_eq!(decoded.get_optype(second), &OpType::from(LogicOp::Not));
 }

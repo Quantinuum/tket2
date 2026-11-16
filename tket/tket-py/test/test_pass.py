@@ -4,11 +4,14 @@ import tempfile
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+from unittest.mock import ANY, patch
 
 import hypothesis.strategies as st
 import numpy as np
 import pytest
+from hugr import ops, tys, val
 from hugr.build.base import Hugr
+from hugr.build.function import Function
 from hugr.package import Package
 from hypothesis import given, settings
 from hypothesis.strategies._internal import SearchStrategy
@@ -17,12 +20,16 @@ from tket_exts import modifier, tket_registry
 from tket._ops import TketOp
 from tket._pattern import Rule, RuleMatcher
 from tket._state import CompilationState
+from tket._state.build import H, from_coms
+from tket._tket import passes as rust_passes
 from tket.passes import (
     GlobalScope,
     InlineFunctions,
     ModifierResolverPass,
     Normalize,
     NormalizeGuppy,
+    ParallelMode,
+    PauliGraphResynthesis,
     PlatformTarget,
     PytketHugrPass,
     QSystemRebasePass,
@@ -478,6 +485,29 @@ def test_issue_1516() -> None:
     CompilationState.from_python(opt_hugr).validate()
 
 
+@pytest.mark.parametrize("target", list(PlatformTarget))
+def test_guppy_2348_nonlocal_output(target: PlatformTarget) -> None:
+    """Check that the pytket roundtrip preserves non-local boolean uses.
+
+    Regression for https://github.com/Quantinuum/guppylang/issues/2348.
+    """
+    function = Function("nonlocal_output", [])
+    source = function.load(val.TRUE)
+    with function.add_nested() as nested:
+        # The boolean bypasses the nested region's input node. Replacing the
+        # outer region must reconnect this use before deleting the LoadConst.
+        consumer = nested.add_op(ops.Noop(tys.Bool), source)
+        nested.set_outputs(consumer)
+    function.set_outputs(nested.parent_node)
+    hugr = function.hugr
+    CompilationState.from_python(hugr).validate()
+
+    result = PytketHugrPass(RemoveRedundancies(), target=target).run(
+        hugr, inplace=False
+    )
+    CompilationState.from_python(result.hugr).validate()
+
+
 def test_python_qsystem_pass() -> None:
     normalize = Normalize()
     hugr = normalize(_hugr_from_path("test_files/guppy_examples/flat_quantum.hugr"))
@@ -507,3 +537,96 @@ def test_python_qsystem_pass_with_modifiers() -> None:
         except Exception as exc:  # noqa: BLE001
             failures.append(f"{hugr_path}: {exc}")
     assert not failures, "QSystem pass failures:\n" + "\n".join(failures)
+
+
+def _count_hadamards(hugr: Hugr) -> int:
+    return sum(
+        data.op.name().rsplit(".", maxsplit=1)[-1] == "H" for _, data in hugr.nodes()
+    )
+
+
+def test_resynthesis_with_default_options() -> None:
+    hugr = from_coms(H(0), H(0)).to_python().modules[0]
+    optimisation = PauliGraphResynthesis()
+
+    result = optimisation.run(hugr, inplace=False)
+
+    assert optimisation.parallel_mode is ParallelMode.Auto
+    assert optimisation.window_size is None
+    assert optimisation.pool_size is None
+    assert optimisation.top_up_size is None
+    assert optimisation.seed is None
+    assert result.results == [("PauliGraphResynthesis", None)]
+    assert _count_hadamards(result.hugr) == 0
+    assert _count_hadamards(hugr) == 2
+    CompilationState.from_python(result.hugr).validate()
+
+
+def test_custom_options_and_scope() -> None:
+    hugr = from_coms(H(0), H(0)).to_python().modules[0]
+    optimisation = PauliGraphResynthesis(
+        window_size=16,
+        pool_size=32,
+        top_up_size=4,
+        seed=7,
+        parallel_mode=ParallelMode.On,
+    )
+    assert optimisation.with_scope(GlobalScope.PRESERVE_ALL) is optimisation
+
+    with patch.object(
+        rust_passes,
+        "pauli_graph_resynthesis",
+        wraps=rust_passes.pauli_graph_resynthesis,
+    ) as resynthesis:
+        result = optimisation.run(hugr, inplace=False)
+
+    resynthesis.assert_called_once_with(
+        ANY,
+        scope=GlobalScope.PRESERVE_ALL,
+        window_size=16,
+        pool_size=32,
+        top_up_size=4,
+        seed=7,
+        parallel_mode=ParallelMode.On,
+        t_optimization=False,
+        ancilla_budget=None,
+    )
+    assert _count_hadamards(result.hugr) == 0
+
+
+@pytest.mark.parametrize(
+    ("parameter", "value", "message"),
+    [
+        ("window_size", -1, "window_size must be positive"),
+        ("window_size", 0, "window_size must be positive"),
+        ("pool_size", -1, "pool_size must be positive"),
+        ("pool_size", 0, "pool_size must be positive"),
+        ("top_up_size", -1, "top_up_size must be positive"),
+        ("top_up_size", 0, "top_up_size must be positive"),
+        ("seed", -1, "seed must be non-negative"),
+    ],
+)
+def test_resynthesis_rejects_invalid_parameters(
+    parameter: str, value: int, message: str
+) -> None:
+    hugr = from_coms(H(0), H(0)).to_python().modules[0]
+    options: dict[str, Any] = {parameter: value}
+
+    with pytest.raises(ValueError, match=f"^{message}$"):
+        PauliGraphResynthesis(**options)
+
+    optimisation = PauliGraphResynthesis()
+    setattr(optimisation, parameter, value)
+
+    with pytest.raises(ValueError, match=f"^{message}$"):
+        optimisation.run(hugr, inplace=True)
+
+    assert _count_hadamards(hugr) == 2
+
+
+def test_wrapper_requires_enum() -> None:
+    invalid_mode: Any = "on"
+    with pytest.raises(
+        TypeError, match="parallel_mode must be an instance of the ParallelMode enum"
+    ):
+        PauliGraphResynthesis(parallel_mode=invalid_mode)

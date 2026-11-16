@@ -1,4 +1,4 @@
-"""`tket-eccs` is a Python package containing compiler rewrite sets used for `tket`'s optimisation passes.
+"""`tket-eccs` is a Python package containing compiler rewrite sets used for `tket`'s optimization passes.
 
 This package is intended to be used as an internal dependency for `tket`.
 """

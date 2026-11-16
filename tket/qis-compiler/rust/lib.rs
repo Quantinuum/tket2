@@ -93,19 +93,6 @@ fn get_module_from_prepared_hugr<'c>(
     )
 }
 
-/// Copy LLVM bitcode into a public byte buffer.
-///
-/// LLVM's in-memory bitcode writer appends an implicit trailing NUL byte. That
-/// terminator is required for some in-process LLVM APIs but must not be exposed
-/// in the public bitcode payload.
-fn public_bitcode_bytes(memory_buffer: &inkwell::memory_buffer::MemoryBuffer<'_>) -> Vec<u8> {
-    let bytes = memory_buffer.as_slice();
-    match bytes.last() {
-        Some(0) => bytes[..bytes.len() - 1].to_vec(),
-        _ => bytes.to_vec(),
-    }
-}
-
 fn get_entry_point_name(namer: &Namer, hugr: &impl HugrView<Node = Node>) -> Result<String> {
     const HUGR_MAIN: &str = "main";
     let (name, entry_point_node) = if hugr.entrypoint_optype().is_module() {
@@ -316,8 +303,7 @@ mod exceptions {
 mod selene_hugr_qis_compiler {
     use super::{
         CompileArgs, Context, Hugr, PyResult, get_native_target_machine, get_opt_level,
-        get_platform, get_target_machine_from_triple, public_bitcode_bytes, pyfunction,
-        read_hugr_envelope,
+        get_platform, get_target_machine_from_triple, pyfunction, read_hugr_envelope,
     };
     use crate::extensions::{
         embedded_extensions as rust_extensions,
@@ -403,7 +389,7 @@ mod selene_hugr_qis_compiler {
                 ),
                 &ctx,
             )?;
-            Ok(public_bitcode_bytes(&llvm_module.write_bitcode_to_memory()))
+            Ok(llvm_module.write_bitcode_to_memory().as_slice().to_vec())
         }
     }
 
@@ -472,11 +458,10 @@ mod tests {
         let module =
             parse_bitcode_as_file(&bitcode).expect("returned bitcode should parse from file");
         let raw_buffer = module.write_bitcode_to_memory();
-        assert_eq!(raw_buffer.as_slice().last(), Some(&0));
         assert_eq!(
-            bitcode,
-            raw_buffer.as_slice()[..raw_buffer.as_slice().len() - 1],
-            "Public bitcode should match LLVM's raw buffer without the implicit trailing NUL"
+            bitcode.as_slice(),
+            raw_buffer.as_slice(),
+            "Public bitcode should preserve LLVM's complete buffer"
         );
     }
 

@@ -1,4 +1,4 @@
-//! Distributed workers for the badger optimiser.
+//! Distributed workers for the badger optimizer.
 
 use std::thread::{self, JoinHandle};
 
@@ -8,7 +8,7 @@ use crate::{Circuit, circuit::cost::CircuitCost};
 
 use super::pqueue_worker::{StatePQueueChannels, Work};
 
-/// A worker that processes circuits for the Badger optimiser.
+/// A worker that processes circuits for the Badger optimizer.
 pub struct BadgerWorker<R, S, P: Ord> {
     /// The worker ID.
     #[expect(dead_code)]

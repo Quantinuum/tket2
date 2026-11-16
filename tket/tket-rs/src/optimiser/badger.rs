@@ -1,10 +1,10 @@
-//! Badger circuit optimiser.
+//! Badger circuit optimizer.
 //!
-//! This module implements the Badger circuit optimiser. It relies on a rewriter
-//! and a RewriteStrategy instance to repeatedly rewrite a circuit and optimising
+//! This module implements the Badger circuit optimizer. It relies on a rewriter
+//! and a RewriteStrategy instance to repeatedly rewrite a circuit and optimizing
 //! it according to some cost metric (typically gate count).
 //!
-//! The optimiser is implemented as a priority queue of circuits to be processed.
+//! The optimizer is implemented as a priority queue of circuits to be processed.
 //! On top of the queue are the circuits with the lowest cost. They are popped
 //! from the queue and replaced by the new circuits obtained from the rewriter
 //! and the rewrite strategy. A hash of every circuit computed is stored to
@@ -35,19 +35,19 @@ use crate::passes::utils::CircuitChunks;
 use crate::rewrite::Rewriter;
 use crate::rewrite::strategy::{RewriteResult, RewriteStrategy};
 
-/// Configuration options for the Badger optimiser.
+/// Configuration options for the Badger optimizer.
 #[derive(Copy, Clone, Debug)]
 pub struct BadgerOptions {
-    /// The maximum time (in seconds) to run the optimiser.
+    /// The maximum time (in seconds) to run the optimizer.
     ///
     /// Defaults to `None`, which means no timeout.
     pub timeout: Option<u64>,
     /// The maximum time (in seconds) to search for new improvements to the
-    /// circuit. If no progress is made in this time, the optimiser will stop.
+    /// circuit. If no progress is made in this time, the optimizer will stop.
     ///
     /// Defaults to `None`, which means no timeout.
     pub progress_timeout: Option<u64>,
-    /// The maximum number of circuits to process before stopping the optimisation.
+    /// The maximum number of circuits to process before stopping the optimization.
     ///
     /// For data parallel multi-threading, (split_circuit=true), applies on a
     /// per-thread basis, otherwise applies globally.
@@ -60,10 +60,10 @@ pub struct BadgerOptions {
     pub n_threads: NonZeroUsize,
     /// Whether to split the circuit into chunks and process each in a separate thread.
     ///
-    /// If this option is set to `true`, the optimiser will split the circuit into `n_threads`
+    /// If this option is set to `true`, the optimizer will split the circuit into `n_threads`
     /// chunks.
     ///
-    /// If this option is set to `false`, the optimiser will run parallel searches on the whole
+    /// If this option is set to `false`, the optimizer will run parallel searches on the whole
     /// circuit.
     ///
     /// Defaults to `false`.
@@ -87,19 +87,19 @@ impl Default for BadgerOptions {
     }
 }
 
-/// The Badger optimiser.
+/// The Badger optimizer.
 ///
 /// Adapted from [Quartz][], and originally [TASO][].
 ///
-/// Using a rewriter and a rewrite strategy, the optimiser
-/// will repeatedly rewrite the circuit, optimising the circuit according to
+/// Using a rewriter and a rewrite strategy, the optimizer
+/// will repeatedly rewrite the circuit, optimizing the circuit according to
 /// the cost function provided.
 ///
-/// Optimisation is done by maintaining a priority queue of circuits and
+/// Optimization is done by maintaining a priority queue of circuits and
 /// always processing the circuit with the lowest cost first. Rewrites are
 /// computed for that circuit and all new circuit obtained are added to the queue.
 ///
-/// There are a single-threaded and two multi-threaded versions of the optimiser,
+/// There are a single-threaded and two multi-threaded versions of the optimizer,
 /// controlled by setting the [`BadgerOptions::n_threads`] and
 /// [`BadgerOptions::split_circuit`] fields.
 ///
@@ -112,7 +112,7 @@ pub struct BadgerOptimiser<R, S> {
 }
 
 impl<R, S> BadgerOptimiser<R, S> {
-    /// Create a new Badger optimiser.
+    /// Create a new Badger optimizer.
     pub fn new(rewriter: R, strategy: S) -> Self {
         Self { rewriter, strategy }
     }
@@ -167,7 +167,7 @@ where
     S: RewriteStrategy + Send + Sync + Clone + 'static,
     S::Cost: serde::Serialize + Send + Sync,
 {
-    /// Run the Badger optimiser on a circuit.
+    /// Run the Badger optimizer on a circuit.
     ///
     /// A timeout (in seconds) can be provided.
     pub fn optimise(
@@ -178,7 +178,7 @@ where
         self.optimise_with_log(circ, Default::default(), options)
     }
 
-    /// Run the Badger optimiser on a circuit with logging activated.
+    /// Run the Badger optimizer on a circuit with logging activated.
     ///
     /// A timeout (in seconds) can be provided.
     pub fn optimise_with_log(
@@ -200,7 +200,7 @@ where
         }
     }
 
-    /// Run the Badger optimiser on a circuit, using a single thread.
+    /// Run the Badger optimizer on a circuit, using a single thread.
     #[tracing::instrument(target = "badger::metrics", skip(self, circ, logger))]
     fn badger(
         &self,
@@ -219,7 +219,7 @@ where
             .unwrap_or_else(|| circ.to_owned())
     }
 
-    /// Run the Badger optimiser on a circuit, using multiple threads.
+    /// Run the Badger optimizer on a circuit, using multiple threads.
     ///
     /// This is the multi-threaded version of [`Self::badger`], using a single
     /// priority queue and multiple workers to process the circuits in parallel.
@@ -360,7 +360,7 @@ where
         best_circ
     }
 
-    /// Run the Badger optimiser on a circuit, with data parallel multithreading.
+    /// Run the Badger optimizer on a circuit, with data parallel multithreading.
     ///
     /// Split the circuit into chunks and process each in a separate thread.
     #[tracing::instrument(target = "badger::metrics", skip(self, circ, logger))]
@@ -452,11 +452,11 @@ mod badger_default {
 
     use super::*;
 
-    /// The default optimisation strategy for the Badger optimiser.
+    /// The default optimization strategy for the Badger optimizer.
     pub type DefaultBadgerStrategy = ExhaustiveGreedyStrategy<StrategyCost>;
     pub type StrategyCost = LexicographicCostFunction<fn(&OpType) -> usize, 2>;
 
-    /// The Badger optimiser using ECC sets.
+    /// The Badger optimizer using ECC sets.
     pub type ECCBadgerOptimiser = BadgerOptimiser<ECCRewriter, DefaultBadgerStrategy>;
 
     impl Default for DefaultBadgerStrategy {
@@ -466,26 +466,26 @@ mod badger_default {
     }
 
     impl DefaultBadgerStrategy {
-        /// A strategy minimising CX gate count.
+        /// A strategy minimizing CX gate count.
         pub fn cx_count() -> Self {
             LexicographicCostFunction::default_cx_strategy()
         }
 
-        /// A strategy minimising Rz gate count.
+        /// A strategy minimizing Rz gate count.
         pub fn rz_count() -> Self {
             LexicographicCostFunction::rz_count().into_greedy_strategy()
         }
     }
 
     impl ECCBadgerOptimiser {
-        /// A sane default optimiser using the given ECC sets.
+        /// A sane default optimizer using the given ECC sets.
         pub fn default_with_eccs_json_file(eccs_path: impl AsRef<Path>) -> io::Result<Self> {
             let rewriter = ECCRewriter::try_from_eccs_json_file(eccs_path)?;
             let strategy = DefaultBadgerStrategy::default();
             Ok(BadgerOptimiser::new(rewriter, strategy))
         }
 
-        /// A sane default optimiser using a precompiled binary rewriter.
+        /// A sane default optimizer using a precompiled binary rewriter.
         #[cfg(feature = "binary-eccs")]
         pub fn default_with_rewriter_binary(
             rewriter_path: impl AsRef<Path>,
@@ -495,14 +495,14 @@ mod badger_default {
             Ok(BadgerOptimiser::new(rewriter, strategy))
         }
 
-        /// An optimiser minimising Rz gate count using the given ECC sets.
+        /// An optimizer minimizing Rz gate count using the given ECC sets.
         pub fn rz_opt_with_eccs_json_file(eccs_path: impl AsRef<Path>) -> io::Result<Self> {
             let rewriter = ECCRewriter::try_from_eccs_json_file(eccs_path)?;
             let strategy = LexicographicCostFunction::rz_count().into_greedy_strategy();
             Ok(BadgerOptimiser::new(rewriter, strategy))
         }
 
-        /// An optimiser minimising Rz gate count using a precompiled binary rewriter.
+        /// An optimizer minimizing Rz gate count using a precompiled binary rewriter.
         #[cfg(feature = "binary-eccs")]
         pub fn rz_opt_with_rewriter_binary(
             rewriter_path: impl AsRef<Path>,
@@ -594,21 +594,21 @@ mod tests {
             .into()
     }
 
-    /// A badger optimiser using a reduced set of rewrite rules.
+    /// A badger optimizer using a reduced set of rewrite rules.
     #[fixture]
     fn badger_opt_json() -> ECCBadgerOptimiser {
         BadgerOptimiser::default_with_eccs_json_file("../../test_files/eccs/small_eccs.json")
             .unwrap()
     }
 
-    /// A badger optimiser using a reduced set of rewrite rules.
+    /// A badger optimizer using a reduced set of rewrite rules.
     #[fixture]
     fn badger_opt_compiled() -> ECCBadgerOptimiser {
         BadgerOptimiser::default_with_rewriter_binary("../../test_files/eccs/small_eccs.rwr")
             .unwrap()
     }
 
-    /// A badger optimiser using the complete nam_6_3 rewrite set.
+    /// A badger optimizer using the complete nam_6_3 rewrite set.
     ///
     /// NOTE: This takes a few seconds to load.
     /// Use [`badger_opt`] if possible.

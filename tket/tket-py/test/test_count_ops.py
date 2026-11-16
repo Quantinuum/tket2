@@ -31,7 +31,9 @@ testdata = [
     ("one_rz", 2),
     ("loop_conditional", 5),
     ("conditional_loop", 5),
-    ("fn_calls", 2),
+    # the following should be 2 ops, but the (unused) from_halfturns_unchecked is not
+    # removed as DCE thinks it might panic - see https://github.com/Quantinuum/tket2/issues/2126
+    ("fn_calls", 3),
     ("repeat_until_success", 21),
     ("extern_def", 1),
 ]

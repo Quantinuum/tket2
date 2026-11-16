@@ -1,4 +1,4 @@
-//! Setup routines for tracing and logging of the optimisation process.
+//! Setup routines for tracing and logging of the optimization process.
 use std::fs::File;
 use std::io::BufWriter;
 use std::path::PathBuf;

@@ -81,7 +81,7 @@ pub struct PatternMatch {
     /// The root of the pattern in the circuit.
     ///
     /// This is redundant with the position attribute, but is a more concise
-    /// representation of the match useful for `PyPatternMatch` or serialisation.
+    /// representation of the match useful for `PyPatternMatch` or serialization.
     pub(super) root: Node,
 }
 
@@ -323,9 +323,9 @@ impl PatternMatcher {
         self.patterns.len()
     }
 
-    /// Serialise a matcher into an IO stream.
+    /// Serialize a matcher into an IO stream.
     ///
-    /// Precomputed matchers can be serialised as binary and then loaded
+    /// Precomputed matchers can be serialized as binary and then loaded
     /// later using [`PatternMatcher::load_binary_io`].
     pub fn save_binary_io<W: io::Write>(
         &self,
@@ -396,17 +396,17 @@ pub enum InvalidPatternMatch {
     Other(InvalidSubgraph),
 }
 
-/// Errors that can occur when (de)serialising a matcher.
+/// Errors that can occur when (de)serializing a matcher.
 #[derive(Debug, Display, Error, From)]
 #[non_exhaustive]
 pub enum MatcherSerialisationError {
     /// An IO error occurred
     #[display("IO error: {_0}")]
     Io(io::Error),
-    /// An error occurred during deserialisation
+    /// An error occurred during deserialization
     #[display("Deserialisation error: {_0}")]
     Deserialisation(rmp_serde::decode::Error),
-    /// An error occurred during serialisation
+    /// An error occurred during serialization
     #[display("Serialisation error: {_0}")]
     Serialisation(rmp_serde::encode::Error),
 }
