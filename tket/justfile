@@ -91,7 +91,7 @@ recompile-modifier name:
     just test_files/modifier_examples/rh "{{name}}.py"
     just test_files/run_modifier_examples/rh "{{name}}"
 
-# Generate unversioned Python declarations and versioned migration snapshots.
+# Generate serialized declarations for the tket extensions
 gen-extensions:
     cargo run -p tket-qsystem gen-extensions -o tket/tket-exts/src/tket_exts/data --unversioned
     cargo run -p tket-qsystem gen-extensions -o tket/tket-migrate/extensions
