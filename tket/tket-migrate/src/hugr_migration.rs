@@ -10,34 +10,36 @@ use hugr::{HugrView, hugr::hugrmut::HugrMut};
 use tket::passes::{ComposablePass, ReplaceTypes};
 
 /// Applies operation and type migrations to a HUGR.
+// NICOLA: we may not need the structure at all here
 pub struct ExtensionUpdater {
     hugr: Hugr,
-    op_mapping: OpMapping,
-    type_mapping: TypeMapping,
 }
 
 impl ExtensionUpdater {
     /// Creates an updater with mappings.
-    pub fn new(hugr: Hugr, op_mapping: OpMapping, type_mapping: TypeMapping) -> Self {
-        Self {
-            hugr,
-            op_mapping,
-            type_mapping,
-        }
+    pub fn new(hugr: Hugr) -> Self {
+        Self { hugr }
     }
 
-    /// NICOLA: TODO
-    pub fn migrate(&mut self) -> Result<Hugr, MigrationError> {
+    /// Applies lists of operation and type mappings in a single replacement pass.
+    ///
+    /// All type mappings are registered before operation replacements are built.
+    /// Later mappings override earlier mappings for the same source.
+    pub fn migrate(
+        &mut self,
+        op_mappings: &[&OpMapping],
+        type_mappings: &[&TypeMapping],
+    ) -> Result<Hugr, MigrationError> {
         let mut replacer = ReplaceTypes::default();
 
-        for (old_type, replacement) in self.type_mapping.iter() {
+        for (old_type, replacement) in type_mappings.iter().flat_map(|mapping| mapping.iter()) {
             let Some(old_type) = old_type.get_type(&self.hugr)? else {
                 continue;
             };
             replacer.set_replace_type(old_type, replacement.get_type(&self.hugr)?);
         }
 
-        for (old_element, replacement) in self.op_mapping.iter() {
+        for (old_element, replacement) in op_mappings.iter().flat_map(|mapping| mapping.iter()) {
             let Some(old_op) = old_element.get_instantiated_op(&self.hugr)? else {
                 continue;
             };
@@ -62,12 +64,14 @@ impl ExtensionUpdater {
 ///
 /// It apply default migration rules.
 fn default_migrate(hugr: Hugr) -> Result<Hugr, MigrationError> {
-    let mut updater = ExtensionUpdater::new(
-        hugr,
-        crate::default_maps::get_measurement_migratation_op_map(),
-        crate::default_maps::get_measurement_migratation_type_map(),
-    );
-    updater.migrate()
+    let mut updater = ExtensionUpdater::new(hugr);
+    updater.migrate(
+        &[
+            &*crate::default_maps::MEAS_OP_MAPPING,
+            &*crate::default_maps::BOOL_OP_MAPPING,
+        ],
+        &[&*crate::default_maps::BOOL_TYPE_MAPPING],
+    )
 }
 
 /// Migrates legacy TKET measurement and boolean operations using local extensions.
@@ -292,6 +296,7 @@ mod tests {
     use hugr::{
         Extension, HugrView,
         extension::{TypeDefBound, Version, prelude::bool_t},
+        hugr::hugrmut::HugrMut,
         ops::OpTrait,
         types::{Signature, Type},
     };
@@ -320,12 +325,11 @@ mod tests {
         // Keep real old-extension operations: the updater must not change them.
         let hugr = bool_graph()?;
         let before = hugr.mermaid_string();
-        let mut updater = ExtensionUpdater::new(
-            hugr,
-            OpMapping::new(HashMap::new()),
-            TypeMapping::new(HashMap::new()),
-        );
-        let new_hugr = updater.migrate()?;
+        let mut updater = ExtensionUpdater::new(hugr);
+        let new_hugr = updater.migrate(
+            &[&OpMapping::new(HashMap::new())],
+            &[&TypeMapping::new(HashMap::new())],
+        )?;
         new_hugr.validate()?;
         assert_eq!(new_hugr.mermaid_string(), before);
         Ok(())
@@ -333,18 +337,17 @@ mod tests {
 
     #[test]
     fn replace_operation_with_empty_type_map_and_no_new_extensions() -> Result<(), Box<dyn Error>> {
-        let mut updater = ExtensionUpdater::new(
-            builtin_negation_graph()?,
-            vec![(
+        let mut updater = ExtensionUpdater::new(builtin_negation_graph()?);
+        let migrated = updater.migrate(
+            &[&vec![(
                 VersionedElement::new("Not".into(), "logic".into(), Version::new(0, 1, 0)),
                 OpReplacementTemplate::TemplateInstance(NodeTemplate::linked_hugr(
                     identity_graph()?
                 )),
             )]
-            .into(),
-            TypeMapping::new(HashMap::new()),
-        );
-        let migrated = updater.migrate()?;
+            .into()],
+            &[&TypeMapping::new(HashMap::new())],
+        )?;
         migrated.validate()?;
         assert!(
             migrated
@@ -363,35 +366,32 @@ mod tests {
     }
 
     #[test]
-    fn versioned_type_replacement_uses_new_or_existing_extensions() -> Result<(), Box<dyn Error>> {
-        for register_via_updater in [true, false] {
-            let target =
-                VersionedElement::new("bool".into(), "tket.bool".into(), Version::new(0, 3, 0));
-            let hugr = old_boolean_graph(false)?;
-            let extension = new_boolean_extension()?;
-            let expected: Type = extension.get_type("bool").unwrap().instantiate([])?.into();
-            let mut updater = ExtensionUpdater::new(
-                hugr,
-                OpMapping::default(),
-                vec![(
-                    old_bool("bool"),
-                    TypeReplacementTemplate::VersionedElement(target.clone()),
-                )]
-                .into(),
-            );
-            let migrated = updater.migrate()?;
-            migrated.validate()?;
-            assert_eq!(
-                migrated
-                    .entrypoint_optype()
-                    .dataflow_signature()
-                    .unwrap()
-                    .as_ref(),
-                &Signature::new_endo([expected]),
-                "register_via_updater={register_via_updater}"
-            );
-            assert!(target.get_type(&migrated)?.is_some());
-        }
+    fn versioned_type_replacement_uses_registered_extension() -> Result<(), Box<dyn Error>> {
+        let target =
+            VersionedElement::new("bool".into(), "tket.bool".into(), Version::new(0, 3, 0));
+        let mut hugr = old_boolean_graph(false)?;
+        let extension = new_boolean_extension()?;
+        let expected: Type = extension.get_type("bool").unwrap().instantiate([])?.into();
+        hugr.use_extensions([extension]);
+        let mut updater = ExtensionUpdater::new(hugr);
+        let migrated = updater.migrate(
+            &[&OpMapping::default()],
+            &[&vec![(
+                old_bool("bool"),
+                TypeReplacementTemplate::VersionedElement(target.clone()),
+            )]
+            .into()],
+        )?;
+        migrated.validate()?;
+        assert_eq!(
+            migrated
+                .entrypoint_optype()
+                .dataflow_signature()
+                .unwrap()
+                .as_ref(),
+            &Signature::new_endo([expected]),
+        );
+        assert!(target.get_type(&migrated)?.is_some());
         Ok(())
     }
 
@@ -399,18 +399,17 @@ mod tests {
     fn valid_mapping_for_unused_operation_preserves_graph() -> Result<(), Box<dyn Error>> {
         let hugr = identity_graph()?;
         let before = hugr.mermaid_string();
-        let mut updater = ExtensionUpdater::new(
-            hugr,
-            vec![(
+        let mut updater = ExtensionUpdater::new(hugr);
+        let new_hugr = updater.migrate(
+            &[&vec![(
                 VersionedElement::new("Not".into(), "logic".into(), Version::new(0, 1, 0)),
                 OpReplacementTemplate::TemplateInstance(NodeTemplate::linked_hugr(
                     identity_graph()?
                 )),
             )]
-            .into(),
-            TypeMapping::new(HashMap::new()),
-        );
-        let new_hugr = updater.migrate()?;
+            .into()],
+            &[&TypeMapping::new(HashMap::new())],
+        )?;
         new_hugr.validate()?;
         assert_eq!(new_hugr.mermaid_string(), before);
         Ok(())
@@ -420,25 +419,24 @@ mod tests {
     fn absent_sources_are_skipped_without_resolving_replacements() -> Result<(), Box<dyn Error>> {
         let hugr = identity_graph()?;
         let before = hugr.mermaid_string();
-        let mut updater = ExtensionUpdater::new(
-            hugr,
-            vec![(
+        let mut updater = ExtensionUpdater::new(hugr);
+        // Neither source extension exists, so both mappings should be ignored.
+        // The replacements are also missing: looking them up would fail the migration.
+        let new_hugr = updater.migrate(
+            &[&vec![(
                 missing("source_op"),
                 OpReplacementTemplate::VersionedElements {
                     first: missing("target_op"),
                     rest: vec![],
                 },
             )]
-            .into(),
-            vec![(
+            .into()],
+            &[&vec![(
                 missing("source_type"),
                 TypeReplacementTemplate::VersionedElement(missing("target_type")),
             )]
-            .into(),
-        );
-        // Neither source extension exists, so both mappings should be ignored.
-        // The replacements are also missing: looking them up would fail the migration.
-        let new_hugr = updater.migrate()?;
+            .into()],
+        )?;
         new_hugr.validate()?;
         assert_eq!(new_hugr.mermaid_string(), before);
         Ok(())
@@ -446,19 +444,20 @@ mod tests {
 
     #[test]
     fn missing_required_replacement_operation_is_an_error() -> Result<(), Box<dyn Error>> {
-        let mut updater = ExtensionUpdater::new(
-            bool_graph()?,
-            vec![(
-                old_bool("not"),
-                OpReplacementTemplate::VersionedElements {
-                    first: missing("target_op"),
-                    rest: vec![],
-                },
-            )]
-            .into(),
-            vec![].into(),
-        );
-        let error = updater.migrate().unwrap_err();
+        let mut updater = ExtensionUpdater::new(bool_graph()?);
+        let error = updater
+            .migrate(
+                &[&vec![(
+                    old_bool("not"),
+                    OpReplacementTemplate::VersionedElements {
+                        first: missing("target_op"),
+                        rest: vec![],
+                    },
+                )]
+                .into()],
+                &[&vec![].into()],
+            )
+            .unwrap_err();
         assert!(matches!(
             error,
             MigrationError::Replacement(ReplacementError::MissingOperationExtension(element))
@@ -469,16 +468,17 @@ mod tests {
 
     #[test]
     fn missing_required_replacement_type_is_an_error() -> Result<(), Box<dyn Error>> {
-        let mut updater = ExtensionUpdater::new(
-            bool_graph()?,
-            vec![].into(),
-            vec![(
-                old_bool("bool"),
-                TypeReplacementTemplate::VersionedElement(missing("target_type")),
-            )]
-            .into(),
-        );
-        let error = updater.migrate().unwrap_err();
+        let mut updater = ExtensionUpdater::new(bool_graph()?);
+        let error = updater
+            .migrate(
+                &[&vec![].into()],
+                &[&vec![(
+                    old_bool("bool"),
+                    TypeReplacementTemplate::VersionedElement(missing("target_type")),
+                )]
+                .into()],
+            )
+            .unwrap_err();
         assert!(matches!(
             error,
             MigrationError::Replacement(ReplacementError::MissingTypeExtension(element))
@@ -489,13 +489,12 @@ mod tests {
 
     #[test]
     fn missing_source_definition_is_identified() -> Result<(), Box<dyn Error>> {
-        let mut updater = ExtensionUpdater::new(
-            bool_graph()?,
-            vec![(old_bool("nonexistent"), OpReplacementTemplate::Empty)].into(),
-            vec![].into(),
-        );
+        let mut updater = ExtensionUpdater::new(bool_graph()?);
         assert!(matches!(
-            updater.migrate(),
+            updater.migrate(
+                &[&vec![(old_bool("nonexistent"), OpReplacementTemplate::Empty)].into()],
+                &[&vec![].into()],
+            ),
             Err(MigrationError::SourceElement(VersionedElementError::MissingOperation(element)))
                 if element == old_bool("nonexistent")
         ));
@@ -504,19 +503,20 @@ mod tests {
 
     #[test]
     fn unsupported_replacement_container_preserves_pass_error() -> Result<(), Box<dyn Error>> {
-        let mut updater = ExtensionUpdater::new(
-            old_boolean_graph(true)?,
-            vec![(
-                old_bool("not"),
-                // A function is not a valid CompoundOp replacement container.
-                OpReplacementTemplate::TemplateInstance(NodeTemplate::CompoundOp(Box::new(
-                    build_bool_cfg_hugr(&boolean_registry()?)?,
-                ))),
-            )]
-            .into(),
-            vec![(old_bool("bool"), TypeReplacementTemplate::Type(bool_t()))].into(),
-        );
-        let error = updater.migrate().unwrap_err();
+        let mut updater = ExtensionUpdater::new(old_boolean_graph(true)?);
+        let error = updater
+            .migrate(
+                &[&vec![(
+                    old_bool("not"),
+                    // A function is not a valid CompoundOp replacement container.
+                    OpReplacementTemplate::TemplateInstance(NodeTemplate::CompoundOp(Box::new(
+                        build_bool_cfg_hugr(&boolean_registry()?)?,
+                    ))),
+                )]
+                .into()],
+                &[&vec![(old_bool("bool"), TypeReplacementTemplate::Type(bool_t()))].into()],
+            )
+            .unwrap_err();
         assert!(
             error
                 .source()

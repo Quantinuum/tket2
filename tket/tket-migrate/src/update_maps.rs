@@ -351,9 +351,10 @@ mod tests {
             for template in templates {
                 let description = format!("{construction:?}, {template:?}");
                 let (ops_map, types_map) = negation_maps(construction, template);
-                let mut updater =
-                    ExtensionUpdater::new(old_boolean_graph(true)?, ops_map, types_map);
-                let migrated = updater.migrate()?;
+                let mut hugr = old_boolean_graph(true)?;
+                hugr.use_extensions([hugr::std_extensions::logic::EXTENSION.clone()]);
+                let mut updater = ExtensionUpdater::new(hugr);
+                let migrated = updater.migrate(&[&ops_map], &[&types_map])?;
                 migrated.validate()?;
                 assert_eq!(
                     migrated
@@ -407,8 +408,10 @@ mod tests {
             };
             assert_eq!(ops.iter().count(), 1);
             assert_eq!(types.iter().count(), 1);
-            let mut updater = ExtensionUpdater::new(old_boolean_graph(true)?, ops, types);
-            let migrated = updater.migrate()?;
+            let mut hugr = old_boolean_graph(true)?;
+            hugr.use_extensions([hugr::std_extensions::logic::EXTENSION.clone()]);
+            let mut updater = ExtensionUpdater::new(hugr);
+            let migrated = updater.migrate(&[&ops], &[&types])?;
             migrated.validate()?;
             assert!(migrated.nodes().any(|node| {
                 migrated
