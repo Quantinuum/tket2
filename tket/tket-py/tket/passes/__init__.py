@@ -160,7 +160,7 @@ class PytketHugrPass(ComposablePass):
 @dataclass
 class Normalize(ComposablePass):
     resolve_modifiers: bool = True
-    remove_cfg_cycles: bool = True
+    remove_cfg_cycles: bool = False
     simplify_cfgs: bool = True
     remove_tuple_untuple: bool = True
     constant_folding: bool = True

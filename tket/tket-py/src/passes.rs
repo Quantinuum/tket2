@@ -107,7 +107,7 @@ create_py_exception!(
 /// - remove_redundant_order_edges: Whether to remove redundant order edges.
 /// - squash_borrows: Whether to squash return-borrow pairs on BorrowArrays.
 #[pyfunction]
-#[pyo3(signature = (circ, *, resolve_modifiers = true, remove_cfg_cycles = true,
+#[pyo3(signature = (circ, *, resolve_modifiers = true, remove_cfg_cycles = false,
     simplify_cfgs = true, remove_tuple_untuple = true, constant_folding = true,
     remove_dead_funcs = true, inline_dfgs = true, inline_funcs = Some(Default::default()),
     remove_redundant_order_edges = true, squash_borrows = true, scope = None))]
