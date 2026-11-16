@@ -87,8 +87,6 @@ pub use untuple::UntuplePass;
 
 // -- Internal modules -------------------------------------------------------
 
-pub(crate) mod half_node;
-
 #[cfg(test)]
 pub(crate) mod test_utils;
 
