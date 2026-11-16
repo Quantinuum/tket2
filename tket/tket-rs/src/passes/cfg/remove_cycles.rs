@@ -105,13 +105,13 @@ pub fn nest_loop<H: HugrMut, P: PathSet<H::Node>>(
 
     let [loop_block, inner_cfg, continue_bb, break_bb, exit_block] =
         make_inner_cfg(hugr, dtn.node, break_rows.clone());
-    for block in &loop_blocks {
+    loop_blocks.iter().for_each(|block| {
         if block == &dtn.node {
             assert_eq!(hugr.get_parent(*block), Some(inner_cfg));
         } else {
             hugr.set_parent(*block, inner_cfg);
         }
-    }
+    });
 
     // For each control-flow edge that exits the loop, make a new BB that exits the loop with a value
     // tagged to indicate which post-loop block to go to, and retarget the edge.
@@ -482,13 +482,13 @@ fn insert_at_lca<N: HugrNode, P: PathSet<N>>(
         .into_group_map();
 
     let mut owned_insertees = HashMap::<N, HashSet<N>>::new();
-    for (insertee, users) in insertee_to_users {
+    insertee_to_users.into_iter().for_each(|(insertee, users)| {
         let ancestor = users.into_iter().exactly_one().ok().unwrap_or(dtn.node);
         owned_insertees
             .entry(ancestor)
             .or_default()
             .insert(insertee);
-    }
+    });
     let new_root_children = {
         let mut cands = owned_insertees.remove(&dtn.node).unwrap_or_default();
         // Put in order: any new child that is a successor of another, must come after it.
