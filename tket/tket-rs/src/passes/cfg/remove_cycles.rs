@@ -261,7 +261,7 @@ fn loop_blocks<H: HugrView>(
     backedges: &impl PathSet<H::Node>,
 ) -> HashSet<H::Node> {
     let mut blocks = HashSet::new();
-    let mut queue = VecDeque::from_iter(backedges.leaves().map(|((node, _), _)| node));
+    let mut queue = VecDeque::from_iter(backedges.split_by_last_edge().map(|((node, _), _)| node));
     while let Some(n) = queue.pop_front() {
         if !blocks.insert(n) || n == loop_header {
             continue;

@@ -13,7 +13,8 @@ pub trait PathSet<N>: Debug + Sized {
     fn new_branch(node: N, num_outports: usize, outport: OutgoingPort, ch: Self) -> Self;
     fn union(&mut self, other: &Self);
     fn concat(&self, other: &Self) -> Self;
-    fn leaves(&self) -> impl Iterator<Item = ((N, OutgoingPort), Self)>;
+
+    fn split_by_last_edge(&self) -> impl Iterator<Item = ((N, OutgoingPort), Self)>;
 
     type OptPath: From<Self> + Debug + Default;
 
@@ -209,7 +210,7 @@ pub(super) fn split_by_target<H: HugrView, P: PathSet<H::Node>>(
     hugr: &H,
 ) -> HashMap<H::Node, P> {
     let mut res = HashMap::<H::Node, P>::new();
-    for ((n, outp), l) in gp.leaves() {
+    for ((n, outp), l) in gp.split_by_last_edge() {
         let (target, _) = hugr.single_linked_input(n, outp).unwrap();
         res.entry(target)
             .and_modify(|existing| existing.union(&l))
@@ -223,7 +224,7 @@ pub(super) fn leaf_targets<'a, H: HugrView, P: PathSet<H::Node> + 'a>(
     hugr: &'a H,
 ) -> impl Iterator<Item = H::Node> + 'a {
     P::opt_as_ref(gp).into_iter().flat_map(move |gp| {
-        gp.leaves()
+        gp.split_by_last_edge()
             .map(|((node, port), _)| hugr.single_linked_input(node, port).unwrap().0)
     })
 }
@@ -250,7 +251,7 @@ impl<N: HugrNode> PathSet<N> for EdgeSources<N> {
         other.clone()
     }
 
-    fn leaves(&self) -> impl Iterator<Item = ((N, OutgoingPort), Self)> {
+    fn split_by_last_edge(&self) -> impl Iterator<Item = ((N, OutgoingPort), Self)> {
         self.iter()
             .map(|&(node, outport)| ((node, outport), Self::from([(node, outport)])))
     }
