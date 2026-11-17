@@ -63,14 +63,7 @@ pub fn migrate_hugr_default(mut hugr: Hugr) -> Result<Hugr, MigrationError> {
 /// Reads a HUGR from bytes and migrates it.
 pub fn migrate_bytes_default(bytes: impl io::BufRead) -> Result<Hugr, MigrationError> {
     let hugr = Hugr::load(bytes, Some(&LOCAL_REGISTRY))?;
-    migrate(
-        hugr,
-        &[
-            &*crate::default_maps::MEAS_OP_MAPPING,
-            &*crate::default_maps::BOOL_OP_MAPPING,
-        ],
-        &[&*crate::default_maps::BOOL_TYPE_MAPPING],
-    )
+    migrate_hugr_default(hugr)
 }
 
 #[cfg(test)]
@@ -213,17 +206,33 @@ pub(crate) mod test_helpers {
 
 #[cfg(test)]
 mod tests {
-    use super::{migrate, migrate_hugr_default, test_helpers::*};
+    use super::{migrate, migrate_bytes_default, migrate_hugr_default, test_helpers::*};
     use crate::update_maps::{OpMapping, OpReplacementTemplate, TypeMapping, VersionedElement};
     use hugr::{
-        HugrView,
+        Hugr, HugrView,
         builder::{DFGBuilder, Dataflow, DataflowHugr},
+        envelope::EnvelopeConfig,
         extension::Version,
         hugr::hugrmut::HugrMut,
         ops::{DataflowOpTrait, OpTrait},
+        package::Package,
     };
     use std::{collections::HashMap, error::Error, path::PathBuf};
     use tket::passes::replace_types::NodeTemplate;
+
+    fn migrate_from_hugr_and_bytes(hugr: Hugr) -> Result<[Hugr; 2], Box<dyn Error>> {
+        // Package::from_hugr omits extension definitions, so loading the bytes
+        // must resolve the legacy operations and types from the local registry.
+        let package = Package::from_hugr(hugr.clone());
+        assert!(package.extensions.is_empty());
+        let mut bytes = Vec::new();
+        package.store(&mut bytes, EnvelopeConfig::text())?;
+        assert!(Hugr::load(bytes.as_slice(), None).is_err());
+        Ok([
+            migrate_hugr_default(hugr)?,
+            migrate_bytes_default(bytes.as_slice())?,
+        ])
+    }
 
     #[test]
     fn empty_maps_preserve_an_existing_graph() -> Result<(), Box<dyn Error>> {
@@ -269,14 +278,15 @@ mod tests {
         let registry = load_registry(&[fixture])?;
         for hugr in [build_bool_hugr(&registry)?, build_bool_cfg_hugr(&registry)?] {
             hugr.validate()?;
-            let migrated = migrate_hugr_default(hugr)?;
-            migrated.validate()?;
-            assert!(migrated.nodes().all(|node| {
-                migrated
-                    .get_optype(node)
-                    .as_extension_op()
-                    .is_none_or(|op| op.extension_id().to_string() != "tket.bool")
-            }));
+            for migrated in migrate_from_hugr_and_bytes(hugr)? {
+                migrated.validate()?;
+                assert!(migrated.nodes().all(|node| {
+                    migrated
+                        .get_optype(node)
+                        .as_extension_op()
+                        .is_none_or(|op| op.extension_id().to_string() != "tket.bool")
+                }));
+            }
         }
         Ok(())
     }
@@ -307,32 +317,34 @@ mod tests {
             let hugr = builder.finish_hugr_with_outputs(outputs)?;
             hugr.validate()?;
 
-            let migrated = migrate_hugr_default(hugr)?;
-            migrated.validate()?;
-            let operations = migrated
-                .nodes()
-                .filter_map(|node| migrated.get_optype(node).as_extension_op())
-                .collect::<Vec<_>>();
-            let expected = tket::extension::TKET_EXTENSION.instantiate_extension_op(name, [])?;
-            assert_eq!(
-                operations,
-                vec![&expected],
-                "Incorrect replacement for {name}"
-            );
-            assert_eq!(
-                operations[0].extension_version(),
-                Version::new(0, 3, 0),
-                "Extension version was not updated for {name}",
-            );
-            assert_eq!(
-                migrated
-                    .entrypoint_optype()
-                    .dataflow_signature()
-                    .unwrap()
-                    .as_ref(),
-                &signature,
-                "Migration changed the signature of {name}",
-            );
+            for migrated in migrate_from_hugr_and_bytes(hugr)? {
+                migrated.validate()?;
+                let operations = migrated
+                    .nodes()
+                    .filter_map(|node| migrated.get_optype(node).as_extension_op())
+                    .collect::<Vec<_>>();
+                let expected =
+                    tket::extension::TKET_EXTENSION.instantiate_extension_op(name, [])?;
+                assert_eq!(
+                    operations,
+                    vec![&expected],
+                    "Incorrect replacement for {name}"
+                );
+                assert_eq!(
+                    operations[0].extension_version(),
+                    Version::new(0, 3, 0),
+                    "Extension version was not updated for {name}",
+                );
+                assert_eq!(
+                    migrated
+                        .entrypoint_optype()
+                        .dataflow_signature()
+                        .unwrap()
+                        .as_ref(),
+                    &signature,
+                    "Migration changed the signature of {name}",
+                );
+            }
         }
         Ok(())
     }
@@ -347,25 +359,26 @@ mod tests {
         ])?;
         let hugr = build_old_hugr(&registry)?;
         hugr.validate()?;
-        let migrated = migrate_hugr_default(hugr)?;
-        migrated.validate()?;
-        let operations = migrated
-            .nodes()
-            .filter_map(|node| migrated.get_optype(node).as_extension_op())
-            .collect::<Vec<_>>();
-        let measurement = operations
-            .iter()
-            .find(|op| op.unqualified_id() == "MeasureFree")
-            .expect("Measurement must remain in the migrated graph");
-        assert_eq!(measurement.extension_version(), Version::new(0, 3, 0));
-        assert!(operations.iter().any(|op| {
-            op.extension_id().to_string() == "tket.measurement" && op.unqualified_id() == "Read"
-        }));
-        assert!(
-            operations
+        for migrated in migrate_from_hugr_and_bytes(hugr)? {
+            migrated.validate()?;
+            let operations = migrated
+                .nodes()
+                .filter_map(|node| migrated.get_optype(node).as_extension_op())
+                .collect::<Vec<_>>();
+            let measurement = operations
                 .iter()
-                .all(|op| op.extension_id().to_string() != "tket.bool")
-        );
+                .find(|op| op.unqualified_id() == "MeasureFree")
+                .expect("Measurement must remain in the migrated graph");
+            assert_eq!(measurement.extension_version(), Version::new(0, 3, 0));
+            assert!(operations.iter().any(|op| {
+                op.extension_id().to_string() == "tket.measurement" && op.unqualified_id() == "Read"
+            }));
+            assert!(
+                operations
+                    .iter()
+                    .all(|op| op.extension_id().to_string() != "tket.bool")
+            );
+        }
         Ok(())
     }
 }
