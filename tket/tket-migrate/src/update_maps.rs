@@ -193,6 +193,14 @@ mod tests {
     use std::error::Error;
     use tket::passes::{ReplaceTypes, replace_types::NodeTemplate};
 
+    fn old_bool(id: &str) -> VersionedElement {
+        VersionedElement::new(id.into(), "tket.bool".into(), Version::new(0, 2, 0))
+    }
+
+    fn missing(id: &str) -> VersionedElement {
+        VersionedElement::new(id.into(), "test.missing".into(), Version::new(1, 0, 0))
+    }
+
     #[test]
     fn versioned_element_display_format() {
         let element = VersionedElement::new(
