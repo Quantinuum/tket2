@@ -17,6 +17,4 @@ pub mod update_maps;
 
 pub use error::{MigrationError, ReplacementError, VersionedElementError};
 pub use hugr_migration::migrate_hugr_default;
-pub use update_maps::{
-    OpMapping, OpReplacementTemplate, TypeMapping, TypeReplacementTemplate, VersionedElement,
-};
+pub use update_maps::{OpMapping, OpReplacementTemplate, TypeMapping, VersionedElement};

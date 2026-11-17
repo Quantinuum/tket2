@@ -20,14 +20,14 @@ fn migrate(
 ) -> Result<Hugr, MigrationError> {
     let mut replacer = ReplaceTypes::default();
 
-    for (old_type, replacement) in type_mappings.iter().flat_map(|mapping| mapping.iter()) {
+    for (old_type, new_type) in type_mappings.iter().flat_map(|mapping| mapping.iter()) {
         let old_type = old_type.get_type(&hugr)?;
-        replacer.set_replace_type(old_type, replacement.get_type(&hugr)?);
+        replacer.set_replace_type(old_type, new_type.clone());
     }
 
     for (old_element, replacement) in op_mappings.iter().flat_map(|mapping| mapping.iter()) {
         let old_op = old_element.get_instantiated_op(&hugr)?;
-        let template = replacement.get_op_replace(&old_op, &hugr, &replacer)?;
+        let template = replacement.get_op_replace(&old_op, &replacer)?;
         replacer.set_replace_op(&old_op, template);
     }
 
@@ -271,10 +271,8 @@ pub(crate) mod test_helpers {
 #[cfg(test)]
 mod tests {
     use super::{migrate, test_helpers::*};
-    use crate::error::{MigrationError, ReplacementError, VersionedElementError};
-    use crate::update_maps::{
-        OpMapping, OpReplacementTemplate, TypeMapping, TypeReplacementTemplate, VersionedElement,
-    };
+    use crate::error::{MigrationError, VersionedElementError};
+    use crate::update_maps::{OpMapping, OpReplacementTemplate, TypeMapping, VersionedElement};
     use hugr::{
         Extension, HugrView,
         extension::{TypeDefBound, Version, prelude::bool_t, simple_op::MakeRegisteredOp},
@@ -318,7 +316,7 @@ mod tests {
             old_bool("not"),
             OpReplacementTemplate::TemplateInstance(replacement),
         );
-        let ty = (old_bool("bool"), TypeReplacementTemplate::Type(bool_t()));
+        let ty = (old_bool("bool"), bool_t());
         match construction {
             MapConstruction::Vector => (vec![op].into(), vec![ty].into()),
             MapConstruction::HashMap => (
@@ -381,15 +379,12 @@ mod tests {
     #[test]
     fn insert_and_vector_construction_replace_duplicate_entries() -> Result<(), Box<dyn Error>> {
         for construction in [MapConstruction::Vector, MapConstruction::Insert] {
-            let bad_op = OpReplacementTemplate::VersionedElements {
-                first: missing("target_op"),
-                rest: vec![],
-            };
+            let bad_op = OpReplacementTemplate::Empty;
             let good_op = OpReplacementTemplate::TemplateInstance(NodeTemplate::SingleOp(
                 LogicOp::Not.to_extension_op()?.into(),
             ));
-            let bad_type = TypeReplacementTemplate::VersionedElement(missing("target_type"));
-            let good_type = TypeReplacementTemplate::Type(bool_t());
+            let bad_type = Type::UNIT;
+            let good_type = bool_t();
             let (ops, types) = match construction {
                 MapConstruction::Vector => (
                     vec![(old_bool("not"), bad_op), (old_bool("not"), good_op)].into(),
@@ -467,7 +462,7 @@ mod tests {
     }
 
     #[test]
-    fn versioned_type_replacement_uses_registered_extension() -> Result<(), Box<dyn Error>> {
+    fn concrete_type_replacement_uses_registered_extension() -> Result<(), Box<dyn Error>> {
         let target =
             VersionedElement::new("bool".into(), "tket.bool".into(), Version::new(0, 3, 0));
         let mut hugr = old_boolean_graph(false)?;
@@ -477,11 +472,7 @@ mod tests {
         let migrated = migrate(
             hugr,
             &[&OpMapping::default()],
-            &[&vec![(
-                old_bool("bool"),
-                TypeReplacementTemplate::VersionedElement(target.clone()),
-            )]
-            .into()],
+            &[&vec![(old_bool("bool"), expected.clone())].into()],
         )?;
         migrated.validate()?;
         assert_eq!(
@@ -520,11 +511,7 @@ mod tests {
     #[test]
     fn absent_source_extensions_are_errors() -> Result<(), Box<dyn Error>> {
         let op_mapping = vec![(missing("source_op"), OpReplacementTemplate::Empty)].into();
-        let type_mapping = vec![(
-            missing("source_type"),
-            TypeReplacementTemplate::Type(bool_t()),
-        )]
-        .into();
+        let type_mapping = vec![(missing("source_type"), bool_t())].into();
         assert!(matches!(
             migrate(identity_graph()?, &[&op_mapping], &[]),
             Err(MigrationError::SourceElement(VersionedElementError::MissingExtension(element)))
@@ -534,51 +521,6 @@ mod tests {
             migrate(identity_graph()?, &[], &[&type_mapping]),
             Err(MigrationError::SourceElement(VersionedElementError::MissingExtension(element)))
                 if element == missing("source_type")
-        ));
-        Ok(())
-    }
-
-    #[test]
-    fn missing_required_replacement_operation_is_an_error() -> Result<(), Box<dyn Error>> {
-        let hugr = bool_graph()?;
-        let error = migrate(
-            hugr,
-            &[&vec![(
-                old_bool("not"),
-                OpReplacementTemplate::VersionedElements {
-                    first: missing("target_op"),
-                    rest: vec![],
-                },
-            )]
-            .into()],
-            &[&vec![].into()],
-        )
-        .unwrap_err();
-        assert!(matches!(
-            error,
-            MigrationError::Replacement(ReplacementError::Element(VersionedElementError::MissingExtension(element)))
-                if element == missing("target_op")
-        ));
-        Ok(())
-    }
-
-    #[test]
-    fn missing_required_replacement_type_is_an_error() -> Result<(), Box<dyn Error>> {
-        let hugr = bool_graph()?;
-        let error = migrate(
-            hugr,
-            &[&vec![].into()],
-            &[&vec![(
-                old_bool("bool"),
-                TypeReplacementTemplate::VersionedElement(missing("target_type")),
-            )]
-            .into()],
-        )
-        .unwrap_err();
-        assert!(matches!(
-            error,
-            MigrationError::Replacement(ReplacementError::Element(VersionedElementError::MissingExtension(element)))
-                if element == missing("target_type")
         ));
         Ok(())
     }
@@ -611,7 +553,7 @@ mod tests {
                 ))),
             )]
             .into()],
-            &[&vec![(old_bool("bool"), TypeReplacementTemplate::Type(bool_t()))].into()],
+            &[&vec![(old_bool("bool"), bool_t())].into()],
         )
         .unwrap_err();
         assert!(

@@ -4,7 +4,7 @@ use hugr::{
     builder::{DFGBuilder, Dataflow, DataflowHugr},
     extension::Version,
     ops::{DataflowOpTrait, ExtensionOp},
-    types::{Signature, Transformable, Type},
+    types::{Transformable, Type},
 };
 use std::{collections::HashMap, fmt};
 use tket::passes::{ReplaceTypes, replace_types::NodeTemplate};
@@ -89,95 +89,30 @@ impl fmt::Display for VersionedElement {
 pub enum OpReplacementTemplate {
     /// An empty replacement template. States that the target should be removed.
     Empty,
-    /// A list of versioned elements declared as name, extension, and version.
-    ///
-    /// The first operation is required. Further operations are connected in sequence.
-    ///
-    /// An empty sequence cannot be constructed:
-    /// ```compile_fail,E0063
-    /// use tket_migrate::OpReplacementTemplate;
-    /// let replacement = OpReplacementTemplate::VersionedElements { rest: vec![] };
-    /// ```
-    VersionedElements {
-        /// The first operation in the replacement sequence.
-        first: VersionedElement,
-        /// Further operations to connect after the first operation, in order.
-        rest: Vec<VersionedElement>,
-    },
     /// The recipe for creating the replacement.
     TemplateInstance(NodeTemplate),
 }
 
 impl OpReplacementTemplate {
-    /// Builds a replacement template
-    pub(crate) fn get_op_replace<T: HugrView>(
+    /// Builds a replacement template.
+    pub(crate) fn get_op_replace(
         &self,
         old_op: &ExtensionOp,
-        hugr: &T,
         replacer: &ReplaceTypes,
     ) -> Result<NodeTemplate, ReplacementError> {
         match self {
             OpReplacementTemplate::TemplateInstance(template) => Ok(template.clone()),
             OpReplacementTemplate::Empty => {
-                Self::get_node_template(old_op, std::iter::empty(), hugr, replacer)
-            }
-            // todo: delete this option
-            OpReplacementTemplate::VersionedElements { first, rest } => Self::get_node_template(
-                old_op,
-                std::iter::once(first).chain(rest.iter()),
-                hugr,
-                replacer,
-            ),
-        }
-    }
-
-    fn get_node_template<'a, T: HugrView>(
-        old_op: &ExtensionOp,
-        versioned_elements: impl IntoIterator<Item = &'a VersionedElement>,
-        hugr: &T,
-        replacer: &ReplaceTypes,
-    ) -> Result<NodeTemplate, ReplacementError> {
-        let operations = versioned_elements
-            .into_iter()
-            .map(|element| element.get_instantiated_op(hugr))
-            .collect::<Result<Vec<_>, _>>()?;
-
-        // Transform the old signature according to the type replacements.
-        let mut old_signature = old_op.signature().into_owned();
-        old_signature.transform(replacer)?;
-
-        let signature = match (operations.first(), operations.last()) {
-            (Some(first), Some(last)) => {
-                let new_signature = Signature::new(
-                    first.signature().input().clone(),
-                    last.signature().output().clone(),
-                );
-
-                if new_signature != old_signature {
-                    return Err(ReplacementError::SignatureMismatch {
-                        expected: old_signature,
-                        actual: new_signature,
-                    });
-                }
-
-                new_signature
-            }
-            _ => {
                 // A passthrough must use the migrated types on both sides.
-                old_signature
+                let mut signature = old_op.signature().into_owned();
+                signature.transform(replacer)?;
+                let builder = DFGBuilder::new(signature)?;
+                let wires = builder.input_wires();
+                Ok(NodeTemplate::linked_hugr(
+                    builder.finish_hugr_with_outputs(wires)?,
+                ))
             }
-        };
-        let mut builder = DFGBuilder::new(signature)?;
-        let mut wires = builder.input_wires().collect::<Vec<_>>();
-        for operation in operations {
-            wires = builder
-                .add_dataflow_op(operation, wires)?
-                .outputs()
-                .collect();
         }
-        Ok(NodeTemplate::linked_hugr(
-            builder.finish_hugr_with_outputs(wires)?,
-        ))
     }
 }
 
@@ -212,60 +147,33 @@ impl From<Vec<(VersionedElement, OpReplacementTemplate)>> for OpMapping {
     }
 }
 
-/// A recipe for creating the replacement
-///
-/// Represents the possible ways to replace a type: either by specifying a versioned element of a custom type or by providing an instance of the new type.
-#[derive(Debug)]
-pub enum TypeReplacementTemplate {
-    /// A versioned element representing the a type.
-    // todo: we can delete this
-    VersionedElement(VersionedElement),
-    /// An instance of the new type.
-    Type(Type),
-}
-
-impl TypeReplacementTemplate {
-    /// Retrieves the type represented by this replacement template.
-    /// Returns an error when a versioned replacement cannot be resolved or instantiated.
-    pub(crate) fn get_type<T: HugrView>(&self, hugr: &T) -> Result<Type, ReplacementError> {
-        match self {
-            TypeReplacementTemplate::VersionedElement(element) => {
-                Ok(element.get_type(hugr)?.into())
-            }
-            TypeReplacementTemplate::Type(t) => Ok(t.clone()),
-        }
-    }
-}
-
 #[derive(Debug)]
 /// Mapping used to update signature of input/output ports of dataflow and controlflow operations.
 ///
 /// Maps a Type, declared as a `VersionedElement`, to a new Type.
 pub struct TypeMapping {
-    map: HashMap<VersionedElement, TypeReplacementTemplate>,
+    map: HashMap<VersionedElement, Type>,
 }
 
 impl TypeMapping {
     /// Creates type mappings from a map of versioned sources to replacements.
-    pub fn new(map: HashMap<VersionedElement, TypeReplacementTemplate>) -> Self {
+    pub fn new(map: HashMap<VersionedElement, Type>) -> Self {
         Self { map }
     }
 
     /// Adds a replacement, overwriting any existing mapping for the same source.
-    pub fn insert(&mut self, old_type: VersionedElement, new_type: TypeReplacementTemplate) {
+    pub fn insert(&mut self, old_type: VersionedElement, new_type: Type) {
         self.map.insert(old_type, new_type);
     }
 
     /// Iterates over source types and their replacements.
-    pub(crate) fn iter(
-        &self,
-    ) -> impl Iterator<Item = (&VersionedElement, &TypeReplacementTemplate)> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (&VersionedElement, &Type)> {
         self.map.iter()
     }
 }
 
-impl From<Vec<(VersionedElement, TypeReplacementTemplate)>> for TypeMapping {
-    fn from(entries: Vec<(VersionedElement, TypeReplacementTemplate)>) -> Self {
+impl From<Vec<(VersionedElement, Type)>> for TypeMapping {
+    fn from(entries: Vec<(VersionedElement, Type)>) -> Self {
         Self {
             map: entries.into_iter().collect(),
         }
@@ -308,145 +216,6 @@ mod tests {
     }
 
     #[test]
-    fn versioned_elements_build_expected_replacement_graph() -> Result<(), Box<dyn Error>> {
-        let hugr = bool_graph()?;
-        let old_op = old_bool("not").get_instantiated_op(&hugr)?;
-        let old_type = old_bool("bool").get_type(&hugr)?;
-        let mut replacer = ReplaceTypes::default();
-        replacer.set_replace_type(old_type.clone(), bool_t());
-        let unchanged_types = ReplaceTypes::default();
-
-        let cases = [
-            (
-                "not",
-                vec![],
-                Signature::new_endo([old_type.into()]),
-                &unchanged_types,
-            ),
-            (
-                "make_opaque",
-                vec!["not", "read"],
-                Signature::new_endo([bool_t()]),
-                &replacer,
-            ),
-        ];
-        for (first, rest, expected_signature, replacer) in cases {
-            let template = OpReplacementTemplate::VersionedElements {
-                first: old_bool(first),
-                rest: rest.iter().map(|name| old_bool(name)).collect(),
-            };
-            let names = std::iter::once(first)
-                .chain(rest.iter().copied())
-                .collect::<Vec<_>>();
-            let NodeTemplate::LinkedHugr(replacement, _) =
-                template.get_op_replace(&old_op, &hugr, replacer)?
-            else {
-                panic!("Expected a graph replacement for {names:?}");
-            };
-            replacement.validate()?;
-            assert_eq!(
-                replacement
-                    .entrypoint_optype()
-                    .dataflow_signature()
-                    .unwrap()
-                    .as_ref(),
-                &expected_signature,
-                "{names:?}"
-            );
-            assert_eq!(
-                replacement
-                    .nodes()
-                    .filter(|&node| replacement.get_optype(node).as_extension_op().is_some())
-                    .count(),
-                names.len(),
-                "{names:?}"
-            );
-
-            // Follow the actual wires to check operation order and the final output.
-            let [input, output] = replacement.get_io(replacement.entrypoint()).unwrap();
-            let mut previous = input;
-            for name in &names {
-                let (node, port) = replacement.single_linked_input(previous, 0).unwrap();
-                assert_eq!(port, hugr::IncomingPort::from(0));
-                let operation = replacement.get_optype(node).as_extension_op().unwrap();
-                assert_eq!(operation.unqualified_id(), *name);
-                assert_eq!(operation.extension_id().to_string(), "tket.bool");
-                assert_eq!(operation.extension_version(), Version::new(0, 2, 0));
-                previous = node;
-            }
-            assert_eq!(
-                replacement.single_linked_input(previous, 0),
-                Some((output, hugr::IncomingPort::from(0))),
-                "{names:?}"
-            );
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn versioned_elements_reject_signature_mismatches() -> Result<(), Box<dyn Error>> {
-        let hugr = bool_graph()?;
-        let old_op = old_bool("not").get_instantiated_op(&hugr)?;
-        let old_type = old_bool("bool").get_type(&hugr)?;
-
-        // Check input type, output type, input arity, and migrated types.
-        for (name, migrate_types) in [
-            ("make_opaque", false),
-            ("read", false),
-            ("and", false),
-            ("not", true),
-        ] {
-            let mut replacer = ReplaceTypes::default();
-            let expected = if migrate_types {
-                replacer.set_replace_type(old_type.clone(), bool_t());
-                Signature::new_endo([bool_t()])
-            } else {
-                old_op.signature().into_owned()
-            };
-            let actual = old_bool(name)
-                .get_instantiated_op(&hugr)?
-                .signature()
-                .into_owned();
-            let template = OpReplacementTemplate::VersionedElements {
-                first: old_bool(name),
-                rest: vec![],
-            };
-            let error = template
-                .get_op_replace(&old_op, &hugr, &replacer)
-                .unwrap_err();
-            assert!(
-                matches!(&error, ReplacementError::SignatureMismatch {
-                    expected: expected_signature,
-                    actual: actual_signature,
-                } if expected_signature == &expected && actual_signature == &actual),
-                "{name}, migrate_types={migrate_types}: {error}"
-            );
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn versioned_elements_reject_incompatible_chains() -> Result<(), Box<dyn Error>> {
-        let hugr = bool_graph()?;
-        let old_op = old_bool("not").get_instantiated_op(&hugr)?;
-        // The second operation requires either two inputs or a different input type.
-        for names @ [first, second] in [["not", "and"], ["not", "make_opaque"]] {
-            let template = OpReplacementTemplate::VersionedElements {
-                first: old_bool(first),
-                rest: vec![old_bool(second)],
-            };
-            let error = template
-                .get_op_replace(&old_op, &hugr, &ReplaceTypes::default())
-                .unwrap_err();
-            assert!(
-                matches!(error, ReplacementError::Build(_)),
-                "{names:?}: {error}"
-            );
-        }
-        Ok(())
-    }
-
-    #[test]
     fn missing_extension_or_version_is_an_error() -> Result<(), Box<dyn Error>> {
         let hugr = bool_graph()?;
         assert!(matches!(
@@ -485,11 +254,6 @@ mod tests {
         assert!(matches!(
             requested.get_type(&hugr),
             Err(VersionedElementError::MissingType(element)) if element == requested
-        ));
-        assert!(matches!(
-            TypeReplacementTemplate::VersionedElement(requested.clone()).get_type(&hugr),
-            Err(ReplacementError::Element(VersionedElementError::MissingType(element)))
-                if element == requested
         ));
         Ok(())
     }
@@ -566,8 +330,7 @@ mod tests {
         replacer.set_replace_type(old_bool("bool").get_type(&hugr)?, bool_t());
         for name in ["make_opaque", "read"] {
             let operation = old_bool(name).get_instantiated_op(&hugr)?;
-            let template =
-                OpReplacementTemplate::Empty.get_op_replace(&operation, &hugr, &replacer)?;
+            let template = OpReplacementTemplate::Empty.get_op_replace(&operation, &replacer)?;
             let NodeTemplate::LinkedHugr(replacement, _) = template else {
                 panic!("Expected a graph replacement for {name}");
             };
@@ -590,7 +353,7 @@ mod tests {
         let hugr = bool_graph()?;
         let operation = old_bool("make_opaque").get_instantiated_op(&hugr)?;
         let error = OpReplacementTemplate::Empty
-            .get_op_replace(&operation, &hugr, &ReplaceTypes::default())
+            .get_op_replace(&operation, &ReplaceTypes::default())
             .unwrap_err();
         assert!(error.source().unwrap().is::<hugr::builder::BuildError>());
         assert!(matches!(error, ReplacementError::Build(_)));

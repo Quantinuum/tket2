@@ -1,8 +1,6 @@
 //! Errors produced when resolving mappings and migrating a HUGR.
 
-use hugr::{
-    Node, builder::BuildError, extension::SignatureError, hugr::ValidationError, types::Signature,
-};
+use hugr::{Node, builder::BuildError, extension::SignatureError, hugr::ValidationError};
 use thiserror::Error;
 use tket::passes::replace_types::ReplaceTypesError;
 
@@ -41,24 +39,13 @@ pub enum VersionedElementError {
     },
 }
 
-/// A replacement type or operation template cannot be constructed.
+/// An operation replacement template cannot be constructed.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum ReplacementError {
-    /// A replacement definition cannot be resolved or instantiated.
-    #[error(transparent)]
-    Element(#[from] VersionedElementError),
     /// Migrating the old operation's signature failed.
     #[error("Could not migrate replacement signature: {0}")]
     Signature(#[from] ReplaceTypesError),
-    /// The replacement does not match the old operation's migrated signature.
-    #[error("Replacement signature {actual} does not match migrated signature {expected}")]
-    SignatureMismatch {
-        /// The old operation's signature after applying type replacements.
-        expected: Signature,
-        /// The replacement sequence's input and output signature.
-        actual: Signature,
-    },
     /// The replacement operations cannot be connected into a valid HUGR.
     #[error("Could not build replacement HUGR: {0}")]
     Build(#[from] BuildError),

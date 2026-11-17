@@ -7,9 +7,7 @@ use hugr::std_extensions::logic::LogicOp;
 use hugr::types::Signature;
 
 use crate::extension_loading::LOCAL_REGISTRY;
-use crate::update_maps::{
-    OpMapping, OpReplacementTemplate, TypeMapping, TypeReplacementTemplate, VersionedElement,
-};
+use crate::update_maps::{OpMapping, OpReplacementTemplate, TypeMapping, VersionedElement};
 use tket::{
     TketOp, extension::measurement::MeasurementOp, hugr::extension::prelude::bool_t,
     passes::replace_types::NodeTemplate,
@@ -196,7 +194,7 @@ fn get_bool_type_map() -> TypeMapping {
             "tket.bool".to_string(),
             Version::new(0, 2, 0),
         ),
-        TypeReplacementTemplate::Type(bool_t()),
+        bool_t(),
     )]
     .into()
 }
