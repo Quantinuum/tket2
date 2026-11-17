@@ -67,10 +67,7 @@ pub enum MigrationError {
     /// Applying the replacements to the HUGR failed.
     #[error("Could not apply extension replacements: {0}")]
     ReplaceTypes(#[from] ReplaceTypesError),
-    /// Reading a local extension file or directory failed.
-    #[error("Could not read local extensions: {0}")]
-    ReadExtensions(#[from] std::io::Error),
     /// Validating the migrated HUGR failed.
-    #[error("Could not validate migrated HUGR: {0}")]
+    #[error("The migration produced an invalid HUGR: {0}")]
     Validate(#[from] ValidationError<Node>),
 }
