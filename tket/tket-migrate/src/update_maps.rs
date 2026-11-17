@@ -30,18 +30,17 @@ impl VersionedElement {
     }
 
     /// Instantiates the extension operation from the given Hugr view.
-    /// Returns `None` when the source extension version is absent.
     ///
-    /// Returns an error when the definition is missing or cannot be instantiated.
+    /// Returns an error when the extension or definition is missing or cannot be instantiated.
     pub(crate) fn get_instantiated_op<T: HugrView>(
         &self,
         hugr: &T,
-    ) -> Result<Option<ExtensionOp>, VersionedElementError> {
+    ) -> Result<ExtensionOp, VersionedElementError> {
         let Some(extension) = hugr
             .extensions()
             .get_exact(&self.extension_id, &self.version)
         else {
-            return Ok(None);
+            return Err(VersionedElementError::MissingExtension(self.clone()));
         };
         let definition = extension
             .get_op(self.id.as_str())
@@ -52,20 +51,19 @@ impl VersionedElement {
                 source,
             }
         })?;
-        Ok(Some(operation))
+        Ok(operation)
     }
 
-    /// Returns `None` when the source extension version is absent.
-    /// Returns an error when the type definition is missing or cannot be instantiated.
+    /// Returns an error when the extension or type definition is missing or cannot be instantiated.
     pub(crate) fn get_type<T: HugrView>(
         &self,
         hugr: &T,
-    ) -> Result<Option<CustomType>, VersionedElementError> {
+    ) -> Result<CustomType, VersionedElementError> {
         let Some(extension) = hugr
             .extensions()
             .get_exact(&self.extension_id, &self.version)
         else {
-            return Ok(None);
+            return Err(VersionedElementError::MissingExtension(self.clone()));
         };
         let definition = extension
             .get_type(self.id.as_str())
@@ -76,7 +74,7 @@ impl VersionedElement {
                 source,
             }
         })?;
-        Ok(Some(ty))
+        Ok(ty)
     }
 }
 
@@ -123,6 +121,7 @@ impl OpReplacementTemplate {
             OpReplacementTemplate::Empty => {
                 Self::get_node_template(old_op, std::iter::empty(), hugr, replacer)
             }
+            // todo: delete this option
             OpReplacementTemplate::VersionedElements { first, rest } => Self::get_node_template(
                 old_op,
                 std::iter::once(first).chain(rest.iter()),
@@ -140,11 +139,7 @@ impl OpReplacementTemplate {
     ) -> Result<NodeTemplate, ReplacementError> {
         let operations = versioned_elements
             .into_iter()
-            .map(|element| {
-                element
-                    .get_instantiated_op(hugr)?
-                    .ok_or_else(|| ReplacementError::MissingOperationExtension(element.clone()))
-            })
+            .map(|element| element.get_instantiated_op(hugr))
             .collect::<Result<Vec<_>, _>>()?;
 
         // Transform the old signature according to the type replacements.
@@ -223,6 +218,7 @@ impl From<Vec<(VersionedElement, OpReplacementTemplate)>> for OpMapping {
 #[derive(Debug)]
 pub enum TypeReplacementTemplate {
     /// A versioned element representing the a type.
+    // todo: we can delete this
     VersionedElement(VersionedElement),
     /// An instance of the new type.
     Type(Type),
@@ -234,10 +230,7 @@ impl TypeReplacementTemplate {
     pub(crate) fn get_type<T: HugrView>(&self, hugr: &T) -> Result<Type, ReplacementError> {
         match self {
             TypeReplacementTemplate::VersionedElement(element) => {
-                let replacement = element
-                    .get_type(hugr)?
-                    .ok_or_else(|| ReplacementError::MissingTypeExtension(element.clone()))?;
-                Ok(replacement.into())
+                Ok(element.get_type(hugr)?.into())
             }
             TypeReplacementTemplate::Type(t) => Ok(t.clone()),
         }
@@ -306,10 +299,10 @@ mod tests {
     #[test]
     fn instantiate_operation_and_type_from_registered_extension() -> Result<(), Box<dyn Error>> {
         let hugr = bool_graph()?;
-        let operation = old_bool("not").get_instantiated_op(&hugr)?.unwrap();
+        let operation = old_bool("not").get_instantiated_op(&hugr)?;
         assert_eq!(operation.unqualified_id(), "not");
         assert_eq!(operation.extension_version(), Version::new(0, 2, 0));
-        let ty = old_bool("bool").get_type(&hugr)?.unwrap();
+        let ty = old_bool("bool").get_type(&hugr)?;
         assert_eq!(ty.name(), "bool");
         Ok(())
     }
@@ -317,8 +310,8 @@ mod tests {
     #[test]
     fn versioned_elements_build_expected_replacement_graph() -> Result<(), Box<dyn Error>> {
         let hugr = bool_graph()?;
-        let old_op = old_bool("not").get_instantiated_op(&hugr)?.unwrap();
-        let old_type = old_bool("bool").get_type(&hugr)?.unwrap();
+        let old_op = old_bool("not").get_instantiated_op(&hugr)?;
+        let old_type = old_bool("bool").get_type(&hugr)?;
         let mut replacer = ReplaceTypes::default();
         replacer.set_replace_type(old_type.clone(), bool_t());
         let unchanged_types = ReplaceTypes::default();
@@ -393,8 +386,8 @@ mod tests {
     #[test]
     fn versioned_elements_reject_signature_mismatches() -> Result<(), Box<dyn Error>> {
         let hugr = bool_graph()?;
-        let old_op = old_bool("not").get_instantiated_op(&hugr)?.unwrap();
-        let old_type = old_bool("bool").get_type(&hugr)?.unwrap();
+        let old_op = old_bool("not").get_instantiated_op(&hugr)?;
+        let old_type = old_bool("bool").get_type(&hugr)?;
 
         // Check input type, output type, input arity, and migrated types.
         for (name, migrate_types) in [
@@ -412,7 +405,6 @@ mod tests {
             };
             let actual = old_bool(name)
                 .get_instantiated_op(&hugr)?
-                .unwrap()
                 .signature()
                 .into_owned();
             let template = OpReplacementTemplate::VersionedElements {
@@ -436,7 +428,7 @@ mod tests {
     #[test]
     fn versioned_elements_reject_incompatible_chains() -> Result<(), Box<dyn Error>> {
         let hugr = bool_graph()?;
-        let old_op = old_bool("not").get_instantiated_op(&hugr)?.unwrap();
+        let old_op = old_bool("not").get_instantiated_op(&hugr)?;
         // The second operation requires either two inputs or a different input type.
         for names @ [first, second] in [["not", "and"], ["not", "make_opaque"]] {
             let template = OpReplacementTemplate::VersionedElements {
@@ -455,18 +447,30 @@ mod tests {
     }
 
     #[test]
-    fn missing_extension_or_version_returns_none() -> Result<(), Box<dyn Error>> {
+    fn missing_extension_or_version_is_an_error() -> Result<(), Box<dyn Error>> {
         let hugr = bool_graph()?;
-        assert!(missing("not").get_instantiated_op(&hugr)?.is_none());
-        assert!(missing("bool").get_type(&hugr)?.is_none());
+        assert!(matches!(
+            missing("not").get_instantiated_op(&hugr),
+            Err(VersionedElementError::MissingExtension(_))
+        ));
+        assert!(matches!(
+            missing("bool").get_type(&hugr),
+            Err(VersionedElementError::MissingExtension(_))
+        ));
 
         // The extension exists, but the requested version does not.
         let mut operation = old_bool("not");
         operation.version = Version::new(99, 0, 0);
-        assert!(operation.get_instantiated_op(&hugr)?.is_none());
+        assert!(matches!(
+            operation.get_instantiated_op(&hugr),
+            Err(VersionedElementError::MissingExtension(_))
+        ));
         let mut ty = old_bool("bool");
         ty.version = Version::new(99, 0, 0);
-        assert!(ty.get_type(&hugr)?.is_none());
+        assert!(matches!(
+            ty.get_type(&hugr),
+            Err(VersionedElementError::MissingExtension(_))
+        ));
         Ok(())
     }
 
@@ -559,9 +563,9 @@ mod tests {
     fn empty_replacements_use_migrated_boolean_signatures() -> Result<(), Box<dyn Error>> {
         let hugr = bool_graph()?;
         let mut replacer = ReplaceTypes::default();
-        replacer.set_replace_type(old_bool("bool").get_type(&hugr)?.unwrap(), bool_t());
+        replacer.set_replace_type(old_bool("bool").get_type(&hugr)?, bool_t());
         for name in ["make_opaque", "read"] {
-            let operation = old_bool(name).get_instantiated_op(&hugr)?.unwrap();
+            let operation = old_bool(name).get_instantiated_op(&hugr)?;
             let template =
                 OpReplacementTemplate::Empty.get_op_replace(&operation, &hugr, &replacer)?;
             let NodeTemplate::LinkedHugr(replacement, _) = template else {
@@ -584,7 +588,7 @@ mod tests {
     #[test]
     fn empty_replacement_cannot_connect_unmigrated_types() -> Result<(), Box<dyn Error>> {
         let hugr = bool_graph()?;
-        let operation = old_bool("make_opaque").get_instantiated_op(&hugr)?.unwrap();
+        let operation = old_bool("make_opaque").get_instantiated_op(&hugr)?;
         let error = OpReplacementTemplate::Empty
             .get_op_replace(&operation, &hugr, &ReplaceTypes::default())
             .unwrap_err();

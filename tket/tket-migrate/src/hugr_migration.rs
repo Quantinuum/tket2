@@ -21,16 +21,12 @@ fn migrate(
     let mut replacer = ReplaceTypes::default();
 
     for (old_type, replacement) in type_mappings.iter().flat_map(|mapping| mapping.iter()) {
-        let Some(old_type) = old_type.get_type(&hugr)? else {
-            continue;
-        };
+        let old_type = old_type.get_type(&hugr)?;
         replacer.set_replace_type(old_type, replacement.get_type(&hugr)?);
     }
 
     for (old_element, replacement) in op_mappings.iter().flat_map(|mapping| mapping.iter()) {
-        let Some(old_op) = old_element.get_instantiated_op(&hugr)? else {
-            continue;
-        };
+        let old_op = old_element.get_instantiated_op(&hugr)?;
         let template = replacement.get_op_replace(&old_op, &hugr, &replacer)?;
         replacer.set_replace_op(&old_op, template);
     }
@@ -496,13 +492,14 @@ mod tests {
                 .as_ref(),
             &Signature::new_endo([expected]),
         );
-        assert!(target.get_type(&migrated)?.is_some());
+        target.get_type(&migrated)?;
         Ok(())
     }
 
     #[test]
     fn valid_mapping_for_unused_operation_preserves_graph() -> Result<(), Box<dyn Error>> {
-        let hugr = identity_graph()?;
+        let mut hugr = identity_graph()?;
+        hugr.use_extensions([hugr::std_extensions::logic::EXTENSION.clone()]);
         let before = hugr.mermaid_string();
         let new_hugr = migrate(
             hugr,
@@ -521,29 +518,23 @@ mod tests {
     }
 
     #[test]
-    fn absent_sources_are_skipped_without_resolving_replacements() -> Result<(), Box<dyn Error>> {
-        let hugr = identity_graph()?;
-        let before = hugr.mermaid_string();
-        // Neither source extension exists, so both mappings should be ignored.
-        // The replacements are also missing: looking them up would fail the migration.
-        let new_hugr = migrate(
-            hugr,
-            &[&vec![(
-                missing("source_op"),
-                OpReplacementTemplate::VersionedElements {
-                    first: missing("target_op"),
-                    rest: vec![],
-                },
-            )]
-            .into()],
-            &[&vec![(
-                missing("source_type"),
-                TypeReplacementTemplate::VersionedElement(missing("target_type")),
-            )]
-            .into()],
-        )?;
-        new_hugr.validate()?;
-        assert_eq!(new_hugr.mermaid_string(), before);
+    fn absent_source_extensions_are_errors() -> Result<(), Box<dyn Error>> {
+        let op_mapping = vec![(missing("source_op"), OpReplacementTemplate::Empty)].into();
+        let type_mapping = vec![(
+            missing("source_type"),
+            TypeReplacementTemplate::Type(bool_t()),
+        )]
+        .into();
+        assert!(matches!(
+            migrate(identity_graph()?, &[&op_mapping], &[]),
+            Err(MigrationError::SourceElement(VersionedElementError::MissingExtension(element)))
+                if element == missing("source_op")
+        ));
+        assert!(matches!(
+            migrate(identity_graph()?, &[], &[&type_mapping]),
+            Err(MigrationError::SourceElement(VersionedElementError::MissingExtension(element)))
+                if element == missing("source_type")
+        ));
         Ok(())
     }
 
@@ -565,7 +556,7 @@ mod tests {
         .unwrap_err();
         assert!(matches!(
             error,
-            MigrationError::Replacement(ReplacementError::MissingOperationExtension(element))
+            MigrationError::Replacement(ReplacementError::Element(VersionedElementError::MissingExtension(element)))
                 if element == missing("target_op")
         ));
         Ok(())
@@ -586,7 +577,7 @@ mod tests {
         .unwrap_err();
         assert!(matches!(
             error,
-            MigrationError::Replacement(ReplacementError::MissingTypeExtension(element))
+            MigrationError::Replacement(ReplacementError::Element(VersionedElementError::MissingExtension(element)))
                 if element == missing("target_type")
         ));
         Ok(())

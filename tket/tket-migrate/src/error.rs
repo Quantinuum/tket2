@@ -8,10 +8,13 @@ use tket::passes::replace_types::ReplaceTypesError;
 
 use crate::VersionedElement;
 
-/// A registered extension cannot provide the requested operation or type.
+/// An extension is missing or cannot provide the requested operation or type.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum VersionedElementError {
+    /// The required extension version is absent.
+    #[error("Element {0} requires a missing extension")]
+    MissingExtension(VersionedElement),
     /// The extension exists, but the operation definition is absent.
     #[error("Operation {0} is missing from its extension")]
     MissingOperation(VersionedElement),
@@ -42,12 +45,6 @@ pub enum VersionedElementError {
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum ReplacementError {
-    /// The extension version required by a replacement operation is absent.
-    #[error("Replacement operation {0} requires a missing extension")]
-    MissingOperationExtension(VersionedElement),
-    /// The extension version required by a replacement type is absent.
-    #[error("Replacement type {0} requires a missing extension")]
-    MissingTypeExtension(VersionedElement),
     /// A replacement definition cannot be resolved or instantiated.
     #[error(transparent)]
     Element(#[from] VersionedElementError),
