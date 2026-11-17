@@ -1,6 +1,6 @@
 //! Load local extension definitions for migration.
 
-use std::sync::{Arc, LazyLock};
+use std::sync::LazyLock;
 
 use hugr::{Extension, extension::ExtensionRegistry};
 
@@ -34,12 +34,17 @@ fn local_registry() -> ExtensionRegistry {
     ]
     .into_iter()
     .map(|json| {
-        Arc::new(
-            serde_json::from_str::<Extension>(json)
-                .expect("Bundled extension declarations must be valid JSON"),
-        )
+        serde_json::from_str::<Extension>(json)
+            .expect("Bundled extension declarations must be valid JSON")
     })
     .collect::<Vec<_>>();
 
-    ExtensionRegistry::new(legacy_extensions)
+    let mut registry = hugr::std_extensions::STD_REG.clone();
+
+    let legacy_registry =
+        ExtensionRegistry::new_with_extension_resolution(legacy_extensions, &(&registry).into())
+            .expect("Bundled migration extensions must resolve");
+
+    registry.extend(legacy_registry);
+    registry
 }
