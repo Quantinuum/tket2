@@ -8,24 +8,38 @@ use hugr::{Extension, extension::ExtensionRegistry};
 pub static LOCAL_REGISTRY: LazyLock<ExtensionRegistry> = LazyLock::new(|| local_registry());
 
 fn local_registry() -> ExtensionRegistry {
-    let mut legacy_extensions = Vec::<Arc<Extension>>::new();
-    let mut directories = vec![std::path::PathBuf::from(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/extensions"
-    ))];
-    while let Some(directory) = directories.pop() {
-        for entry in std::fs::read_dir(directory).unwrap() {
-            let entry = entry.unwrap();
-            let file_type = entry.file_type().unwrap();
-            let path = entry.path();
-            if file_type.is_dir() {
-                directories.push(path);
-            } else if file_type.is_file() && path.extension().is_some_and(|ext| ext == "json") {
-                let reader = std::io::BufReader::new(std::fs::File::open(path).unwrap());
-                legacy_extensions.push(Arc::new(serde_json::from_reader(reader).unwrap()));
-            }
-        }
-    }
+    let legacy_extensions = [
+        include_str!("../extensions/TKET1-0.2.0.json"),
+        include_str!("../extensions/tket/argument-0.1.0.json"),
+        include_str!("../extensions/tket/bool-0.2.0.json"),
+        include_str!("../extensions/tket/debug-0.2.0.json"),
+        include_str!("../extensions/tket/futures-0.2.0.json"),
+        include_str!("../extensions/tket/global_phase-0.1.0.json"),
+        include_str!("../extensions/tket/globals-0.1.0.json"),
+        include_str!("../extensions/tket/gpu-0.2.0.json"),
+        include_str!("../extensions/tket/guppy-0.2.0.json"),
+        include_str!("../extensions/tket/measurement-0.1.0.json"),
+        include_str!("../extensions/tket/modifier-0.1.0.json"),
+        include_str!("../extensions/tket/pauli_exp-0.1.0.json"),
+        include_str!("../extensions/tket/qsystem-0.6.0.json"),
+        include_str!("../extensions/tket/qsystem/helios-0.6.0.json"),
+        include_str!("../extensions/tket/qsystem/random-0.2.1.json"),
+        include_str!("../extensions/tket/qsystem/sol-0.6.0.json"),
+        include_str!("../extensions/tket/qsystem/utils-0.3.0.json"),
+        include_str!("../extensions/tket/quantum-0.2.1.json"),
+        include_str!("../extensions/tket/quantum-0.3.0.json"),
+        include_str!("../extensions/tket/result-0.2.0.json"),
+        include_str!("../extensions/tket/rotation-0.2.0.json"),
+        include_str!("../extensions/tket/wasm-0.5.0.json"),
+    ]
+    .into_iter()
+    .map(|json| {
+        Arc::new(
+            serde_json::from_str::<Extension>(json)
+                .expect("Bundled extension declarations must be valid JSON"),
+        )
+    })
+    .collect::<Vec<_>>();
 
     ExtensionRegistry::new(legacy_extensions)
 }
