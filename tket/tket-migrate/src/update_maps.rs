@@ -282,16 +282,15 @@ impl From<Vec<(VersionedElement, TypeReplacementTemplate)>> for TypeMapping {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hugr_migration::{ExtensionUpdater, test_helpers::*};
+    use crate::hugr_migration::test_helpers::*;
     use hugr::{
         Extension, HugrView,
-        extension::{TypeDefBound, Version, prelude::bool_t, simple_op::MakeRegisteredOp},
+        extension::{TypeDefBound, Version, prelude::bool_t},
         hugr::hugrmut::HugrMut,
         ops::OpTrait,
-        std_extensions::logic::LogicOp,
         types::{PolyFuncType, Signature, TypeBound},
     };
-    use std::{collections::HashMap, error::Error};
+    use std::error::Error;
     use tket::passes::{ReplaceTypes, replace_types::NodeTemplate};
 
     #[test]
@@ -302,125 +301,6 @@ mod tests {
             Version::new(1, 2, 3),
         );
         assert_eq!(format!("{element}"), "MeasureFree in tket.quantum@1.2.3");
-    }
-
-    #[derive(Clone, Copy, Debug)]
-    enum MapConstruction {
-        Vector,
-        HashMap,
-        Insert,
-    }
-
-    fn negation_maps(
-        construction: MapConstruction,
-        replacement: NodeTemplate,
-    ) -> (OpMapping, TypeMapping) {
-        let op = (
-            old_bool("not"),
-            OpReplacementTemplate::TemplateInstance(replacement),
-        );
-        let ty = (old_bool("bool"), TypeReplacementTemplate::Type(bool_t()));
-        match construction {
-            MapConstruction::Vector => (vec![op].into(), vec![ty].into()),
-            MapConstruction::HashMap => (
-                OpMapping::new(HashMap::from([op])),
-                TypeMapping::new(HashMap::from([ty])),
-            ),
-            MapConstruction::Insert => {
-                let mut ops = OpMapping::default();
-                let mut types = TypeMapping::new(HashMap::new());
-                ops.insert(op.0, op.1);
-                types.insert(ty.0, ty.1);
-                (ops, types)
-            }
-        }
-    }
-
-    #[test]
-    fn map_constructors_support_all_node_template_forms() -> Result<(), Box<dyn Error>> {
-        for construction in [
-            MapConstruction::Vector,
-            MapConstruction::HashMap,
-            MapConstruction::Insert,
-        ] {
-            let templates = [
-                NodeTemplate::SingleOp(LogicOp::Not.to_extension_op()?.into()),
-                NodeTemplate::CompoundOp(Box::new(builtin_negation_graph()?)),
-                NodeTemplate::linked_hugr(builtin_negation_graph()?),
-            ];
-            for template in templates {
-                let description = format!("{construction:?}, {template:?}");
-                let (ops_map, types_map) = negation_maps(construction, template);
-                let mut hugr = old_boolean_graph(true)?;
-                hugr.use_extensions([hugr::std_extensions::logic::EXTENSION.clone()]);
-                let mut updater = ExtensionUpdater::new(hugr);
-                let migrated = updater.migrate(&[&ops_map], &[&types_map])?;
-                migrated.validate()?;
-                assert_eq!(
-                    migrated
-                        .entrypoint_optype()
-                        .dataflow_signature()
-                        .unwrap()
-                        .as_ref(),
-                    &Signature::new_endo([bool_t()]),
-                    "{description}"
-                );
-                let operations = migrated
-                    .nodes()
-                    .filter_map(|node| migrated.get_optype(node).as_extension_op())
-                    .collect::<Vec<_>>();
-                assert_eq!(operations.len(), 1, "{description}");
-                assert_eq!(
-                    operations[0].qualified_id().to_string(),
-                    "logic.Not",
-                    "{description}"
-                );
-            }
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn insert_and_vector_construction_replace_duplicate_entries() -> Result<(), Box<dyn Error>> {
-        for construction in [MapConstruction::Vector, MapConstruction::Insert] {
-            let bad_op = OpReplacementTemplate::VersionedElements {
-                first: missing("target_op"),
-                rest: vec![],
-            };
-            let good_op = OpReplacementTemplate::TemplateInstance(NodeTemplate::SingleOp(
-                LogicOp::Not.to_extension_op()?.into(),
-            ));
-            let bad_type = TypeReplacementTemplate::VersionedElement(missing("target_type"));
-            let good_type = TypeReplacementTemplate::Type(bool_t());
-            let (ops, types) = match construction {
-                MapConstruction::Vector => (
-                    vec![(old_bool("not"), bad_op), (old_bool("not"), good_op)].into(),
-                    vec![(old_bool("bool"), bad_type), (old_bool("bool"), good_type)].into(),
-                ),
-                MapConstruction::Insert => {
-                    let mut ops = OpMapping::new(HashMap::from([(old_bool("not"), bad_op)]));
-                    let mut types = TypeMapping::new(HashMap::from([(old_bool("bool"), bad_type)]));
-                    ops.insert(old_bool("not"), good_op);
-                    types.insert(old_bool("bool"), good_type);
-                    (ops, types)
-                }
-                MapConstruction::HashMap => unreachable!(),
-            };
-            assert_eq!(ops.iter().count(), 1);
-            assert_eq!(types.iter().count(), 1);
-            let mut hugr = old_boolean_graph(true)?;
-            hugr.use_extensions([hugr::std_extensions::logic::EXTENSION.clone()]);
-            let mut updater = ExtensionUpdater::new(hugr);
-            let migrated = updater.migrate(&[&ops], &[&types])?;
-            migrated.validate()?;
-            assert!(migrated.nodes().any(|node| {
-                migrated
-                    .get_optype(node)
-                    .as_extension_op()
-                    .is_some_and(|op| op.qualified_id() == "logic.Not")
-            }));
-        }
-        Ok(())
     }
 
     #[test]

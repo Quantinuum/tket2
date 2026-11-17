@@ -9,63 +9,51 @@ use hugr::Hugr;
 use hugr::{HugrView, hugr::hugrmut::HugrMut};
 use tket::passes::{ComposablePass, ReplaceTypes};
 
-/// Applies operation and type migrations to a HUGR.
-// NICOLA: we may not need the structure at all here
-pub struct ExtensionUpdater {
-    hugr: Hugr,
-}
-
-impl ExtensionUpdater {
-    /// Creates an updater with mappings.
-    pub fn new(hugr: Hugr) -> Self {
-        Self { hugr }
-    }
-
-    /// Applies lists of operation and type mappings in a single replacement pass.
-    ///
-    /// All type mappings are registered before operation replacements are built.
-    /// Later mappings override earlier mappings for the same source.
-    pub fn migrate(
-        &mut self,
-        op_mappings: &[&OpMapping],
-        type_mappings: &[&TypeMapping],
-    ) -> Result<Hugr, MigrationError> {
-        let mut replacer = ReplaceTypes::default();
-
-        for (old_type, replacement) in type_mappings.iter().flat_map(|mapping| mapping.iter()) {
-            let Some(old_type) = old_type.get_type(&self.hugr)? else {
-                continue;
-            };
-            replacer.set_replace_type(old_type, replacement.get_type(&self.hugr)?);
-        }
-
-        for (old_element, replacement) in op_mappings.iter().flat_map(|mapping| mapping.iter()) {
-            let Some(old_op) = old_element.get_instantiated_op(&self.hugr)? else {
-                continue;
-            };
-            let template = replacement.get_op_replace(&old_op, &self.hugr, &replacer)?;
-            replacer.set_replace_op(&old_op, template);
-        }
-
-        replacer.run(&mut self.hugr)?;
-
-        // remove unused extensions
-        let registry = self.hugr.extensions().clone();
-        self.hugr.resolve_extension_defs(&registry).unwrap();
-
-        self.hugr.validate()?;
-
-        // NICOLA: clone not needed?
-        Ok(self.hugr.clone())
-    }
-}
-
-/// Given an Hugr with the needed extensions, migrates it.
+/// Applies lists of operation and type mappings in a single replacement pass.
 ///
-/// It apply default migration rules.
-fn default_migrate(hugr: Hugr) -> Result<Hugr, MigrationError> {
-    let mut updater = ExtensionUpdater::new(hugr);
-    updater.migrate(
+/// All type mappings are registered before operation replacements are built.
+/// Later mappings override earlier mappings for the same source.
+fn migrate(
+    mut hugr: Hugr,
+    op_mappings: &[&OpMapping],
+    type_mappings: &[&TypeMapping],
+) -> Result<Hugr, MigrationError> {
+    let mut replacer = ReplaceTypes::default();
+
+    for (old_type, replacement) in type_mappings.iter().flat_map(|mapping| mapping.iter()) {
+        let Some(old_type) = old_type.get_type(&hugr)? else {
+            continue;
+        };
+        replacer.set_replace_type(old_type, replacement.get_type(&hugr)?);
+    }
+
+    for (old_element, replacement) in op_mappings.iter().flat_map(|mapping| mapping.iter()) {
+        let Some(old_op) = old_element.get_instantiated_op(&hugr)? else {
+            continue;
+        };
+        let template = replacement.get_op_replace(&old_op, &hugr, &replacer)?;
+        replacer.set_replace_op(&old_op, template);
+    }
+
+    replacer.run(&mut hugr)?;
+
+    // remove unused extensions
+    let registry = hugr.extensions().clone();
+    hugr.resolve_extension_defs(&registry).unwrap();
+
+    hugr.validate()?;
+
+    Ok(hugr)
+}
+
+/// Migrates legacy TKET measurement and boolean operations using local extensions.
+///
+/// The HUGR may contain unresolved operations and types and no extension registry.
+pub fn migrate_hugr_default(mut hugr: Hugr) -> Result<Hugr, MigrationError> {
+    // Ensure that the hugr has all the extensions
+    hugr.use_extensions(&*LOCAL_REGISTRY);
+    migrate(
+        hugr,
         &[
             &*crate::default_maps::MEAS_OP_MAPPING,
             &*crate::default_maps::BOOL_OP_MAPPING,
@@ -76,19 +64,17 @@ fn default_migrate(hugr: Hugr) -> Result<Hugr, MigrationError> {
 
 /// Migrates legacy TKET measurement and boolean operations using local extensions.
 ///
-/// The HUGR may contain unresolved operations and types and no extension registry.
-pub fn migrate_hugr_default(mut hugr: Hugr) -> Result<Hugr, MigrationError> {
-    // Ensure that the hugr has all the extensions
-    hugr.use_extensions(&*LOCAL_REGISTRY);
-    default_migrate(hugr)
-}
-
-/// Migrates legacy TKET measurement and boolean operations using local extensions.
-///
 /// Reads a HUGR from bytes and migrates it.
 pub fn migrate_bytes_default(bytes: impl io::BufRead) -> Result<Hugr, MigrationError> {
     let hugr = Hugr::load(bytes, Some(&LOCAL_REGISTRY))?;
-    default_migrate(hugr)
+    migrate(
+        hugr,
+        &[
+            &*crate::default_maps::MEAS_OP_MAPPING,
+            &*crate::default_maps::BOOL_OP_MAPPING,
+        ],
+        &[&*crate::default_maps::BOOL_TYPE_MAPPING],
+    )
 }
 
 #[cfg(test)]
@@ -288,16 +274,17 @@ pub(crate) mod test_helpers {
 
 #[cfg(test)]
 mod tests {
-    use super::{ExtensionUpdater, test_helpers::*};
+    use super::{migrate, test_helpers::*};
     use crate::error::{MigrationError, ReplacementError, VersionedElementError};
     use crate::update_maps::{
         OpMapping, OpReplacementTemplate, TypeMapping, TypeReplacementTemplate, VersionedElement,
     };
     use hugr::{
         Extension, HugrView,
-        extension::{TypeDefBound, Version, prelude::bool_t},
+        extension::{TypeDefBound, Version, prelude::bool_t, simple_op::MakeRegisteredOp},
         hugr::hugrmut::HugrMut,
         ops::OpTrait,
+        std_extensions::logic::LogicOp,
         types::{Signature, Type},
     };
     use std::{collections::HashMap, error::Error, path::PathBuf, sync::Arc};
@@ -320,13 +307,130 @@ mod tests {
         )
     }
 
+    #[derive(Clone, Copy, Debug)]
+    enum MapConstruction {
+        Vector,
+        HashMap,
+        Insert,
+    }
+
+    fn negation_maps(
+        construction: MapConstruction,
+        replacement: NodeTemplate,
+    ) -> (OpMapping, TypeMapping) {
+        let op = (
+            old_bool("not"),
+            OpReplacementTemplate::TemplateInstance(replacement),
+        );
+        let ty = (old_bool("bool"), TypeReplacementTemplate::Type(bool_t()));
+        match construction {
+            MapConstruction::Vector => (vec![op].into(), vec![ty].into()),
+            MapConstruction::HashMap => (
+                OpMapping::new(HashMap::from([op])),
+                TypeMapping::new(HashMap::from([ty])),
+            ),
+            MapConstruction::Insert => {
+                let mut ops = OpMapping::default();
+                let mut types = TypeMapping::new(HashMap::new());
+                ops.insert(op.0, op.1);
+                types.insert(ty.0, ty.1);
+                (ops, types)
+            }
+        }
+    }
+
+    #[test]
+    fn map_constructors_support_all_node_template_forms() -> Result<(), Box<dyn Error>> {
+        for construction in [
+            MapConstruction::Vector,
+            MapConstruction::HashMap,
+            MapConstruction::Insert,
+        ] {
+            let templates = [
+                NodeTemplate::SingleOp(LogicOp::Not.to_extension_op()?.into()),
+                NodeTemplate::CompoundOp(Box::new(builtin_negation_graph()?)),
+                NodeTemplate::linked_hugr(builtin_negation_graph()?),
+            ];
+            for template in templates {
+                let description = format!("{construction:?}, {template:?}");
+                let (ops_map, types_map) = negation_maps(construction, template);
+                let mut hugr = old_boolean_graph(true)?;
+                hugr.use_extensions([hugr::std_extensions::logic::EXTENSION.clone()]);
+                let migrated = migrate(hugr, &[&ops_map], &[&types_map])?;
+                migrated.validate()?;
+                assert_eq!(
+                    migrated
+                        .entrypoint_optype()
+                        .dataflow_signature()
+                        .unwrap()
+                        .as_ref(),
+                    &Signature::new_endo([bool_t()]),
+                    "{description}"
+                );
+                let operations = migrated
+                    .nodes()
+                    .filter_map(|node| migrated.get_optype(node).as_extension_op())
+                    .collect::<Vec<_>>();
+                assert_eq!(operations.len(), 1, "{description}");
+                assert_eq!(
+                    operations[0].qualified_id().to_string(),
+                    "logic.Not",
+                    "{description}"
+                );
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn insert_and_vector_construction_replace_duplicate_entries() -> Result<(), Box<dyn Error>> {
+        for construction in [MapConstruction::Vector, MapConstruction::Insert] {
+            let bad_op = OpReplacementTemplate::VersionedElements {
+                first: missing("target_op"),
+                rest: vec![],
+            };
+            let good_op = OpReplacementTemplate::TemplateInstance(NodeTemplate::SingleOp(
+                LogicOp::Not.to_extension_op()?.into(),
+            ));
+            let bad_type = TypeReplacementTemplate::VersionedElement(missing("target_type"));
+            let good_type = TypeReplacementTemplate::Type(bool_t());
+            let (ops, types) = match construction {
+                MapConstruction::Vector => (
+                    vec![(old_bool("not"), bad_op), (old_bool("not"), good_op)].into(),
+                    vec![(old_bool("bool"), bad_type), (old_bool("bool"), good_type)].into(),
+                ),
+                MapConstruction::Insert => {
+                    let mut ops = OpMapping::new(HashMap::from([(old_bool("not"), bad_op)]));
+                    let mut types = TypeMapping::new(HashMap::from([(old_bool("bool"), bad_type)]));
+                    ops.insert(old_bool("not"), good_op);
+                    types.insert(old_bool("bool"), good_type);
+                    (ops, types)
+                }
+                MapConstruction::HashMap => unreachable!(),
+            };
+            assert_eq!(ops.iter().count(), 1);
+            assert_eq!(types.iter().count(), 1);
+            let mut hugr = old_boolean_graph(true)?;
+            hugr.use_extensions([hugr::std_extensions::logic::EXTENSION.clone()]);
+            let migrated = migrate(hugr, &[&ops], &[&types])?;
+            migrated.validate()?;
+            assert!(migrated.nodes().any(|node| {
+                migrated
+                    .get_optype(node)
+                    .as_extension_op()
+                    .is_some_and(|op| op.qualified_id() == "logic.Not")
+            }));
+        }
+        Ok(())
+    }
+
     #[test]
     fn empty_maps_preserve_an_existing_graph() -> Result<(), Box<dyn Error>> {
-        // Keep real old-extension operations: the updater must not change them.
+        // Keep real old-extension operations: migration must not change them.
         let hugr = bool_graph()?;
         let before = hugr.mermaid_string();
-        let mut updater = ExtensionUpdater::new(hugr);
-        let new_hugr = updater.migrate(
+        let new_hugr = migrate(
+            hugr,
             &[&OpMapping::new(HashMap::new())],
             &[&TypeMapping::new(HashMap::new())],
         )?;
@@ -337,8 +441,9 @@ mod tests {
 
     #[test]
     fn replace_operation_with_empty_type_map_and_no_new_extensions() -> Result<(), Box<dyn Error>> {
-        let mut updater = ExtensionUpdater::new(builtin_negation_graph()?);
-        let migrated = updater.migrate(
+        let hugr = builtin_negation_graph()?;
+        let migrated = migrate(
+            hugr,
             &[&vec![(
                 VersionedElement::new("Not".into(), "logic".into(), Version::new(0, 1, 0)),
                 OpReplacementTemplate::TemplateInstance(NodeTemplate::linked_hugr(
@@ -373,8 +478,8 @@ mod tests {
         let extension = new_boolean_extension()?;
         let expected: Type = extension.get_type("bool").unwrap().instantiate([])?.into();
         hugr.use_extensions([extension]);
-        let mut updater = ExtensionUpdater::new(hugr);
-        let migrated = updater.migrate(
+        let migrated = migrate(
+            hugr,
             &[&OpMapping::default()],
             &[&vec![(
                 old_bool("bool"),
@@ -399,8 +504,8 @@ mod tests {
     fn valid_mapping_for_unused_operation_preserves_graph() -> Result<(), Box<dyn Error>> {
         let hugr = identity_graph()?;
         let before = hugr.mermaid_string();
-        let mut updater = ExtensionUpdater::new(hugr);
-        let new_hugr = updater.migrate(
+        let new_hugr = migrate(
+            hugr,
             &[&vec![(
                 VersionedElement::new("Not".into(), "logic".into(), Version::new(0, 1, 0)),
                 OpReplacementTemplate::TemplateInstance(NodeTemplate::linked_hugr(
@@ -419,10 +524,10 @@ mod tests {
     fn absent_sources_are_skipped_without_resolving_replacements() -> Result<(), Box<dyn Error>> {
         let hugr = identity_graph()?;
         let before = hugr.mermaid_string();
-        let mut updater = ExtensionUpdater::new(hugr);
         // Neither source extension exists, so both mappings should be ignored.
         // The replacements are also missing: looking them up would fail the migration.
-        let new_hugr = updater.migrate(
+        let new_hugr = migrate(
+            hugr,
             &[&vec![(
                 missing("source_op"),
                 OpReplacementTemplate::VersionedElements {
@@ -444,20 +549,20 @@ mod tests {
 
     #[test]
     fn missing_required_replacement_operation_is_an_error() -> Result<(), Box<dyn Error>> {
-        let mut updater = ExtensionUpdater::new(bool_graph()?);
-        let error = updater
-            .migrate(
-                &[&vec![(
-                    old_bool("not"),
-                    OpReplacementTemplate::VersionedElements {
-                        first: missing("target_op"),
-                        rest: vec![],
-                    },
-                )]
-                .into()],
-                &[&vec![].into()],
-            )
-            .unwrap_err();
+        let hugr = bool_graph()?;
+        let error = migrate(
+            hugr,
+            &[&vec![(
+                old_bool("not"),
+                OpReplacementTemplate::VersionedElements {
+                    first: missing("target_op"),
+                    rest: vec![],
+                },
+            )]
+            .into()],
+            &[&vec![].into()],
+        )
+        .unwrap_err();
         assert!(matches!(
             error,
             MigrationError::Replacement(ReplacementError::MissingOperationExtension(element))
@@ -468,17 +573,17 @@ mod tests {
 
     #[test]
     fn missing_required_replacement_type_is_an_error() -> Result<(), Box<dyn Error>> {
-        let mut updater = ExtensionUpdater::new(bool_graph()?);
-        let error = updater
-            .migrate(
-                &[&vec![].into()],
-                &[&vec![(
-                    old_bool("bool"),
-                    TypeReplacementTemplate::VersionedElement(missing("target_type")),
-                )]
-                .into()],
-            )
-            .unwrap_err();
+        let hugr = bool_graph()?;
+        let error = migrate(
+            hugr,
+            &[&vec![].into()],
+            &[&vec![(
+                old_bool("bool"),
+                TypeReplacementTemplate::VersionedElement(missing("target_type")),
+            )]
+            .into()],
+        )
+        .unwrap_err();
         assert!(matches!(
             error,
             MigrationError::Replacement(ReplacementError::MissingTypeExtension(element))
@@ -489,9 +594,10 @@ mod tests {
 
     #[test]
     fn missing_source_definition_is_identified() -> Result<(), Box<dyn Error>> {
-        let mut updater = ExtensionUpdater::new(bool_graph()?);
+        let hugr = bool_graph()?;
         assert!(matches!(
-            updater.migrate(
+            migrate(
+                hugr,
                 &[&vec![(old_bool("nonexistent"), OpReplacementTemplate::Empty)].into()],
                 &[&vec![].into()],
             ),
@@ -503,20 +609,20 @@ mod tests {
 
     #[test]
     fn unsupported_replacement_container_preserves_pass_error() -> Result<(), Box<dyn Error>> {
-        let mut updater = ExtensionUpdater::new(old_boolean_graph(true)?);
-        let error = updater
-            .migrate(
-                &[&vec![(
-                    old_bool("not"),
-                    // A function is not a valid CompoundOp replacement container.
-                    OpReplacementTemplate::TemplateInstance(NodeTemplate::CompoundOp(Box::new(
-                        build_bool_cfg_hugr(&boolean_registry()?)?,
-                    ))),
-                )]
-                .into()],
-                &[&vec![(old_bool("bool"), TypeReplacementTemplate::Type(bool_t()))].into()],
-            )
-            .unwrap_err();
+        let hugr = old_boolean_graph(true)?;
+        let error = migrate(
+            hugr,
+            &[&vec![(
+                old_bool("not"),
+                // A function is not a valid CompoundOp replacement container.
+                OpReplacementTemplate::TemplateInstance(NodeTemplate::CompoundOp(Box::new(
+                    build_bool_cfg_hugr(&boolean_registry()?)?,
+                ))),
+            )]
+            .into()],
+            &[&vec![(old_bool("bool"), TypeReplacementTemplate::Type(bool_t()))].into()],
+        )
+        .unwrap_err();
         assert!(
             error
                 .source()

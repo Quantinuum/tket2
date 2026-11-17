@@ -79,7 +79,6 @@ fn get_tket_quantum_op_map() -> OpMapping {
                 "X" => NodeTemplate::SingleOp(TketOp::X.into()),
                 "Y" => NodeTemplate::SingleOp(TketOp::Y.into()),
                 "Z" => NodeTemplate::SingleOp(TketOp::Z.into()),
-                // NICOLA TODO: not sure here
                 "symbolic_angle" => continue,
                 _ => panic!("Unexpected tket.quantum@0.2.1 operation: {name}"),
             }),
