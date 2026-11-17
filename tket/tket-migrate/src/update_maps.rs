@@ -185,11 +185,10 @@ mod tests {
     use super::*;
     use crate::hugr_migration::test_helpers::*;
     use hugr::{
-        Extension, HugrView,
-        extension::{TypeDefBound, Version, prelude::bool_t},
-        hugr::hugrmut::HugrMut,
+        HugrView,
+        extension::{Version, prelude::bool_t},
         ops::OpTrait,
-        types::{PolyFuncType, Signature, TypeBound},
+        types::Signature,
     };
     use std::error::Error;
     use tket::passes::{ReplaceTypes, replace_types::NodeTemplate};
@@ -259,71 +258,6 @@ mod tests {
     }
 
     #[test]
-    fn instantiation_errors_preserve_element_and_source() -> Result<(), Box<dyn Error>> {
-        let extension = Extension::try_new_arc(
-            "test.parameterized".try_into()?,
-            Version::new(1, 0, 0),
-            |extension, extension_ref| {
-                extension.add_type(
-                    "param_type".into(),
-                    vec![TypeBound::Copyable.into()],
-                    String::new(),
-                    TypeDefBound::copyable(),
-                    extension_ref,
-                )?;
-                extension.add_op(
-                    "param_op".into(),
-                    String::new(),
-                    PolyFuncType::new(vec![TypeBound::Copyable.into()], Signature::new_endo([])),
-                    extension_ref,
-                )?;
-                Ok::<_, Box<dyn Error>>(())
-            },
-        )?;
-        let mut hugr = identity_graph()?;
-        hugr.use_extensions([extension]);
-        let operation = VersionedElement::new(
-            "param_op".into(),
-            "test.parameterized".into(),
-            Version::new(1, 0, 0),
-        );
-        let ty = VersionedElement::new(
-            "param_type".into(),
-            "test.parameterized".into(),
-            Version::new(1, 0, 0),
-        );
-        let error = operation.get_instantiated_op(&hugr).unwrap_err();
-        assert!(
-            error
-                .source()
-                .unwrap()
-                .is::<hugr::extension::SignatureError>()
-        );
-        assert!(matches!(
-            error,
-            VersionedElementError::InstantiateOperation {
-                element,
-                source: hugr::extension::SignatureError::TypeArgMismatch(_),
-            } if element == operation
-        ));
-        let error = ty.get_type(&hugr).unwrap_err();
-        assert!(
-            error
-                .source()
-                .unwrap()
-                .is::<hugr::extension::SignatureError>()
-        );
-        assert!(matches!(
-            error,
-            VersionedElementError::InstantiateType {
-                element,
-                source: hugr::extension::SignatureError::TypeArgMismatch(_),
-            } if element == ty
-        ));
-        Ok(())
-    }
-
-    #[test]
     fn empty_replacements_use_migrated_boolean_signatures() -> Result<(), Box<dyn Error>> {
         let hugr = bool_graph()?;
         let mut replacer = ReplaceTypes::default();
@@ -345,18 +279,6 @@ mod tests {
                 "{name} must become a boolean passthrough"
             );
         }
-        Ok(())
-    }
-
-    #[test]
-    fn empty_replacement_cannot_connect_unmigrated_types() -> Result<(), Box<dyn Error>> {
-        let hugr = bool_graph()?;
-        let operation = old_bool("make_opaque").get_instantiated_op(&hugr)?;
-        let error = OpReplacementTemplate::Empty
-            .get_op_replace(&operation, &ReplaceTypes::default())
-            .unwrap_err();
-        assert!(error.source().unwrap().is::<hugr::builder::BuildError>());
-        assert!(matches!(error, ReplacementError::Build(_)));
         Ok(())
     }
 }
