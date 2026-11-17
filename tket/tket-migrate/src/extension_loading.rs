@@ -5,7 +5,7 @@ use std::sync::LazyLock;
 use hugr::{Extension, extension::ExtensionRegistry};
 
 /// Registry containing local extensions for migration.
-pub static LOCAL_REGISTRY: LazyLock<ExtensionRegistry> = LazyLock::new(|| local_registry());
+pub static LOCAL_REGISTRY: LazyLock<ExtensionRegistry> = LazyLock::new(local_registry);
 
 fn local_registry() -> ExtensionRegistry {
     let legacy_extensions = [

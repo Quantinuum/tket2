@@ -16,13 +16,13 @@ use tket::{
 /// Mapping to replace the legacy TKET boolean type with the built-in HUGR boolean type.
 ///
 /// Maps `tket.bool@0.2.0::bool` to the type returned by [`bool_t`].
-pub static BOOL_TYPE_MAPPING: LazyLock<TypeMapping> = LazyLock::new(|| get_bool_type_map());
+pub static BOOL_TYPE_MAPPING: LazyLock<TypeMapping> = LazyLock::new(get_bool_type_map);
 
 /// Mapping to replace legacy operations from the `tket.quantum` extension.
 ///
 /// - `tket.quantum@0.2.1::MeasureFree` becomes
 ///   `tket.quantum@0.3.0::MeasureFree` followed by `tket.measurement@0.1.0::Read`.
-pub static MEAS_OP_MAPPING: LazyLock<OpMapping> = LazyLock::new(|| get_tket_quantum_op_map());
+pub static MEAS_OP_MAPPING: LazyLock<OpMapping> = LazyLock::new(get_tket_quantum_op_map);
 
 /// Mapping to replace legacy operations from the `tket.bool` extension.
 ///
