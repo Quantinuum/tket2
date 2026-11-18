@@ -22,6 +22,9 @@ impl<N: HugrNode> ModifierResolver<N> {
     /// decomposes into a global phase. Set `map_order_ports` only when `n` is itself a
     /// `GlobalPhase`: its state order ports are then mapped to those of every `GlobalPhase`
     /// emitted (there may be several).
+    /// 
+    /// If the global phase results from a different gate decomposition order,
+    /// the edges may not be preserved (see https://github.com/Quantinuum/tket2/issues/1947).
     pub(crate) fn modify_global_phase(
         &mut self,
         n: N,
@@ -29,11 +32,12 @@ impl<N: HugrNode> ModifierResolver<N> {
         new_fn: &mut impl Dataflow,
         ancilla: &mut Vec<Wire<Node>>,
     ) -> Result<Vec<(Node, IncomingPort)>, ModifierResolverErrors<N>> {
+        let phase_op = OpType::from(GlobalPhase);
         match (self.modifiers.dagger, self.control_num()) {
             (false, 0) => {
                 let node = new_fn.add_child_node(GlobalPhase);
                 if map_order_ports {
-                    self.map_phase_order_ports(n, node)?;
+                    self.wire_state_order(n, &phase_op, node, &phase_op)?;
                 }
                 Ok(vec![(node, IncomingPort::from(0))])
             }
@@ -48,7 +52,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                     .map(|out| out.out_wire(0))?;
                 let phase = new_fn.add_dataflow_op(GlobalPhase, vec![angle])?.node();
                 if map_order_ports {
-                    self.map_phase_order_ports(n, phase)?;
+                    self.wire_state_order(n, &phase_op, phase, &phase_op)?;
                 }
                 Ok(vec![(halfturn, IncomingPort::from(0))])
             }
@@ -108,24 +112,6 @@ impl<N: HugrNode> ModifierResolver<N> {
                 Ok(result)
             }
         }
-    }
-}
-
-impl<N: HugrNode> ModifierResolver<N> {
-    /// Map the StateOrder ports of `old_phase` to those of `new_phase`.
-    fn map_phase_order_ports(
-        &mut self,
-        old_phase: N,
-        new_phase: Node,
-    ) -> Result<(), ModifierResolverErrors<N>> {
-        let optype = OpType::from(GlobalPhase);
-        if let Some(port) = optype.other_input_port() {
-            self.map_insert((old_phase, port).into(), (new_phase, port).into())?;
-        }
-        if let Some(port) = optype.other_output_port() {
-            self.map_insert((old_phase, port).into(), (new_phase, port).into())?;
-        }
-        Ok(())
     }
 }
 
@@ -244,9 +230,20 @@ mod tests {
 
         // After resolving, we should not have any missing correspondence errors.
         test_resolve(&mut h);
-        assert!(
-            h.nodes()
-                .any(|node| GlobalPhase::from_optype(h.get_optype(node)).is_some()),
-        );
+        let phases: Vec<_> = h
+            .nodes()
+            .filter(|node| GlobalPhase::from_optype(h.get_optype(*node)).is_some())
+            .collect();
+        assert!(!phases.is_empty());
+
+        // Order edges are dropped under dagger. Otherwise they must still reach the phase.
+        // Phases produced as a by-product of decomposing other gates (e.g. the controlled Rz)
+        // carry no order edges, so we only require that some phase keeps them.
+        if !dagger {
+            assert!(phases.iter().any(|&phase| {
+                h.single_linked_output(phase, order_in).is_some()
+                    && h.linked_inputs(phase, order_out).next().is_some()
+            }));
+        }
     }
 }
