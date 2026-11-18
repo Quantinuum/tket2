@@ -2836,6 +2836,7 @@ dependencies = [
  "tk-pg-core",
  "tk-pg-ir-kernels",
  "tk-pg-qm-tableau",
+ "tk-pg-utils",
 ]
 
 [[package]]

@@ -6,6 +6,7 @@ use bitvec::prelude::*;
 use tk_pg_core::{GateData, GateType, Op, Pauli, PauliGraph, TableauData};
 use tk_pg_ir_kernels::{PGRewrite, PGTableau};
 use tk_pg_qm_tableau::Tableau;
+use tk_pg_utils::equiv_0;
 
 /// Optimize T count using the last `budget` qubits as reserved idle ancillas.
 pub fn optimize(pauli_graph: &PauliGraph, budget: usize, first_bit: usize) -> PauliGraph {
@@ -15,10 +16,11 @@ pub fn optimize(pauli_graph: &PauliGraph, budget: usize, first_bit: usize) -> Pa
     let mut output = PauliGraph::new(width);
     let mut region = PauliGraph::new(width);
     let mut next_bit = first_bit;
-    
+
     for op in pauli_graph.get_ops() {
         let boundary = match op {
-            Op::Rotation { .. } | Op::Tableau { .. } => false,
+            Op::Rotation { data } => !equiv_0(data.get_angle(), 0.25),
+            Op::Tableau { .. } => false,
             Op::Gate { data } => {
                 *data.get_gate_type() != GateType::H
                     || !data.get_conditional_bits().is_empty()
