@@ -262,12 +262,6 @@ fn cmd_to_op(
         // To prevent a blackbox which acts on bits from being incorrectly reordered during optimisation,
         // we say it acts on all qubits, to prevent it from being reordered.
         OpType::Barrier | OpType::SetBits => {
-            if cmd.op.op_type == OpType::SetBits
-                && (!qubits.is_empty() || register_map.qubit_map.is_empty())
-            {
-                return Err(ConversionError::UnsupportedOpType(OpType::SetBits));
-            }
-
             let blackbox_qubits = if cmd.op.op_type == OpType::SetBits || !bits.is_empty() {
                 (0..register_map.qubit_map.len()).collect()
             } else {
@@ -277,8 +271,8 @@ fn cmd_to_op(
             let content = serde_json::to_string(&BlackBoxContent {
                 command: cmd.clone(),
             })
-            .map_err(|_| {
-                ConversionError::UnsupportedBlackBox("Failed black-box conversion".to_string())
+            .map_err(|e| {
+                ConversionError::UnsupportedBlackBox(e.to_string())
             })?;
 
             Ok(vec![Op::BlackBox {
@@ -678,7 +672,7 @@ pub enum ConversionError {
     #[error(ignore)]
     ImpossibleParams(String),
     /// Unsupported BlackBox
-    #[display("Error converting to serial circuit: Unsupported BlackBox content: {_0}")]
+    #[display("Error converting to serial circuit: Error converting BlackBox: {_0}")]
     #[error(ignore)]
     UnsupportedBlackBox(String),
     /// A qubit or bit is not present in the [`RegisterMap`].
