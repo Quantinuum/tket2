@@ -16,7 +16,7 @@ use tk_pg_core::{PGPass, PauliGraph};
 use crate::optimizer::optimize;
 
 /// A T-count optimization pass for rotations, tableaux, and unconditional H gates.
-/// Measurements, resets, conditional gates, black boxes and non Clifford+T 
+/// Measurements, resets, conditional gates, black boxes and non Clifford+T
 /// rotations separate optimization regions.
 #[derive(Default)]
 pub struct TOptimizationPass {
