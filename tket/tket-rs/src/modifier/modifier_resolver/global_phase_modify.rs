@@ -22,7 +22,7 @@ impl<N: HugrNode> ModifierResolver<N> {
     /// decomposes into a global phase. Set `map_order_ports` only when `n` is itself a
     /// `GlobalPhase`: its state order ports are then mapped to those of every `GlobalPhase`
     /// emitted (there may be several).
-    /// 
+    ///
     /// If the global phase results from a different gate decomposition order,
     /// the edges may not be preserved (see https://github.com/Quantinuum/tket2/issues/1947).
     pub(crate) fn modify_global_phase(
