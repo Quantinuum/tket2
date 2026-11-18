@@ -219,6 +219,32 @@ fn make_pack_unpack_rewrite<'h, T: HugrView>(
         return None;
     }
 
+    // A sink unpack has no output boundary. Selecting it together with the
+    // pack and other unpacks can be rejected by boundary-based subgraph
+    // reconstruction as non-convex. Remove these sinks separately,
+    // then simplify the remaining pack/unpack pair on the next iteration.
+    let unused_unpacks = unpack_nodes
+        .iter()
+        .copied()
+        .filter(|&n| hugr.node_outputs(n).all(|p| !hugr.is_linked(n, p)))
+        .collect_vec();
+    if !unused_unpacks.is_empty() {
+        let parent = node_parent.expect("pack node has no parent");
+        let checker = convex_checker
+            .get_or_insert_with(|| SchedGraphChecker::new(hugr.scheduling_graph(parent)));
+        let subgraph =
+            SiblingSubgraph::try_from_nodes_with_checker(unused_unpacks, hugr, checker).unwrap();
+        let replacement = FunctionBuilder::new("<repl>", subgraph.poly_func_type(hugr))
+            .unwrap()
+            .finish_hugr_with_outputs([])
+            .unwrap();
+        return Some(
+            subgraph
+                .create_simple_replacement(hugr, replacement)
+                .unwrap(),
+        );
+    }
+
     // Remove all unpack operations, and remove the pack operation if all neighbours are unpacks.
     let num_other_outputs = links.len() - unpack_nodes.len();
     Some(remove_pack_unpack(
@@ -507,9 +533,8 @@ mod test {
         let [b3, b4] = h.add_dataflow_op(op, [tuple]).unwrap().outputs_arr();
 
         // The last one's outputs are disconnected.
-        // TODO: Adding this causes the test to fail due to a `NonCovex` error.
-        //let op = UnpackTuple::new(vec![bool_t(), bool_t()].into());
-        //let _ = h.add_dataflow_op(op, [tuple]).unwrap();
+        let op = UnpackTuple::new(vec![bool_t(), bool_t()].into());
+        let _ = h.add_dataflow_op(op, [tuple]).unwrap();
 
         h.finish_hugr_with_outputs([b1, b2, b3, b4]).unwrap()
     }
@@ -604,6 +629,53 @@ mod test {
             .collect_vec();
         outputs.extend(extra_field.map(|i| fields[i]));
         h.finish_hugr_with_outputs(outputs).unwrap()
+    }
+
+    /// Regression for <https://github.com/Quantinuum/tket2/issues/2172>.
+    #[rstest]
+    #[case::used_and_unused(1, 1, false)]
+    #[case::multiple_unused(2, 3, false)]
+    #[case::all_unused(0, 2, false)]
+    #[case::retained_tuple(1, 1, true)]
+    #[case::unused_with_retained_tuple(0, 2, true)]
+    fn test_unused_unpacks(#[case] used: usize, #[case] unused: usize, #[case] retain_tuple: bool) {
+        let fields = vec![bool_t(), bool_t()];
+        let mut output_types = vec![bool_t(); used];
+        if retain_tuple {
+            output_types.push(Type::new_tuple(fields.clone()));
+        }
+        let mut h = DFGBuilder::new(Signature::new(fields.clone(), output_types)).unwrap();
+        let tuple = h.make_tuple(h.input_wires()).unwrap();
+        let mut outputs = Vec::new();
+        for i in 0..used + unused {
+            let [_, second] = h
+                .add_dataflow_op(UnpackTuple::new(fields.clone().into()), [tuple])
+                .unwrap()
+                .outputs_arr();
+            if i < used {
+                outputs.push(second);
+            }
+        }
+        if retain_tuple {
+            outputs.push(tuple);
+        }
+        let mut hugr = h.finish_hugr_with_outputs(outputs).unwrap();
+        hugr.validate().unwrap();
+        let pass = UntuplePass::default();
+        pass.run(&mut hugr).unwrap();
+        hugr.validate().unwrap();
+        let [input, output] = hugr.get_io(hugr.entrypoint()).unwrap();
+        for i in 0..used {
+            assert_eq!(
+                hugr.single_linked_output(output, i),
+                Some((input, 1.into()))
+            );
+        }
+        assert_eq!(
+            hugr.children(hugr.entrypoint()).count(),
+            2 + usize::from(retain_tuple)
+        );
+        assert_eq!(pass.run(&mut hugr).unwrap().rewrites_applied, 0);
     }
 
     #[rstest]
@@ -886,7 +958,7 @@ mod test {
     #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case::simple(simple_pack_unpack(), 1, 2)]
     #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
-    #[case::multi(multi_unpack(), 1, 2)]
+    #[case::multi(multi_unpack(), 2, 2)]
     #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case::partial(partial_unpack(), 1, 3)]
     #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
