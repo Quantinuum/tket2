@@ -259,15 +259,9 @@ fn cmd_to_op(
             data: GateData::new(GateType::Reset, qubits),
         }]),
         // Currently, pg-lib blackboxes support specifying the qubits they act on, but not the bits.
-        // To prevent a blackbox which acts on bits from being incorrectly reordered during optimisation,
+        // To prevent a blackbox which acts on bits, or any SetBits, from being incorrectly reordered during optimisation,
         // we say it acts on all qubits, to prevent it from being reordered.
         OpType::Barrier | OpType::SetBits => {
-            if cmd.op.op_type == OpType::SetBits
-                && (!qubits.is_empty() || register_map.qubit_map.is_empty())
-            {
-                return Err(ConversionError::UnsupportedOpType(OpType::SetBits));
-            }
-
             let blackbox_qubits = if cmd.op.op_type == OpType::SetBits || !bits.is_empty() {
                 (0..register_map.qubit_map.len()).collect()
             } else {
@@ -277,8 +271,8 @@ fn cmd_to_op(
             let content = serde_json::to_string(&BlackBoxContent {
                 command: cmd.clone(),
             })
-            .map_err(|_| {
-                ConversionError::UnsupportedBlackBox("Failed black-box conversion".to_string())
+            .map_err(|e| {
+                ConversionError::UnsupportedBlackBox(e.to_string())
             })?;
 
             Ok(vec![Op::BlackBox {
@@ -678,7 +672,7 @@ pub enum ConversionError {
     #[error(ignore)]
     ImpossibleParams(String),
     /// Unsupported BlackBox
-    #[display("Error converting to serial circuit: Unsupported BlackBox content: {_0}")]
+    #[display("Error converting to serial circuit: Error converting BlackBox: {_0}")]
     #[error(ignore)]
     UnsupportedBlackBox(String),
     /// A qubit or bit is not present in the [`RegisterMap`].
@@ -1006,6 +1000,23 @@ mod tests {
 
         assert_eq!(cmd_to_op(&command, &registers).unwrap(), vec![op.clone()]);
         assert_eq!(op_to_cmd(&op, &registers).unwrap(), vec![command]);
+    }
+
+    #[rstest]
+    fn preserves_set_bits(registers: RegisterMap) {
+        let command: Command<String> = serde_json::from_value(serde_json::json!({
+            "op": {"type": "SetBits", "classical": {"values": [true, false]}},
+            "args": [["result", [8]], ["result", [3]]],
+        }))
+        .unwrap();
+
+        let ops = cmd_to_op(&command, &registers).unwrap();
+        let [Op::BlackBox { data }] = ops.as_slice() else {
+            panic!("SetBits must be encoded as a black box");
+        };
+
+        assert_eq!(data.get_qubits(), &vec![0, 1, 2]);
+        assert_eq!(op_to_cmd(&ops[0], &registers).unwrap(), vec![command]);
     }
 
     #[rstest]
