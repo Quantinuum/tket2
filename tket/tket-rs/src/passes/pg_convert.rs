@@ -259,7 +259,7 @@ fn cmd_to_op(
             data: GateData::new(GateType::Reset, qubits),
         }]),
         // Currently, pg-lib blackboxes support specifying the qubits they act on, but not the bits.
-        // To prevent a blackbox which acts on bits from being incorrectly reordered during optimisation,
+        // To prevent a blackbox which acts on bits, or any SetBits, from being incorrectly reordered during optimisation,
         // we say it acts on all qubits, to prevent it from being reordered.
         OpType::Barrier | OpType::SetBits => {
             if cmd.op.op_type == OpType::SetBits
