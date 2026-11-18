@@ -615,7 +615,7 @@ fn op_to_cmd(op: &Op, register_map: &RegisterMap) -> Result<Vec<Command<String>>
                     })?;
 
                     let payload: BlackBoxContent = serde_json::from_str(content)
-                        .map_err(|_| ConversionError::UnsupportedBlackBox(content.to_owned()))?;
+                        .map_err(|e| ConversionError::UnsupportedBlackBox(e.to_string()))?;
                     Ok(vec![payload.command])
                 }
                 _ => Err(ConversionError::UnsupportedGate(
@@ -626,7 +626,7 @@ fn op_to_cmd(op: &Op, register_map: &RegisterMap) -> Result<Vec<Command<String>>
         Op::BlackBox { data } => {
             let content = data.get_content();
             let payload: BlackBoxContent = serde_json::from_str(content)
-                .map_err(|_| ConversionError::UnsupportedBlackBox(content.to_owned()))?;
+                .map_err(|e| ConversionError::UnsupportedBlackBox(e.to_string()))?;
             Ok(vec![payload.command])
         }
         _ => Err(ConversionError::UnsupportedOp(op.clone())),
