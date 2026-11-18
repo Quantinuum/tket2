@@ -1,7 +1,8 @@
-//! Pass for removing redundant tuple pack->unpack operations.
+//! Pass for removing redundant tuple pack/unpack operations in either order.
 
 use std::collections::VecDeque;
 
+use fxhash::FxHashSet;
 use hugr::hugr::views::sibling_subgraph::SchedGraphChecker;
 use hugr_core::builder::{Dataflow, DataflowHugr, FunctionBuilder};
 use hugr_core::extension::prelude::{MakeTuple, UnpackTuple};
@@ -29,6 +30,16 @@ use crate::passes::{ComposablePass, PassScope};
 /// Removes `MakeTuple` operations that are not consumed by any other
 /// operations.
 ///
+/// Also removes `UnpackTuple` operations followed by `MakeTuple`s that repack
+/// all their fields in the original order. If the unpacked fields have other
+/// consumers and the tuple is copyable, the `UnpackTuple` is retained and only
+/// the repacks are removed. Linear tuples with other field consumers are left
+/// unchanged.
+/// These operations must also be in the same region.
+///
+/// Repeats simplification until no further rewrites are possible, including
+/// pairs exposed by simplifying nested tuples.
+///
 /// Ignores pack/unpack nodes with order edges.
 // TODO: Supporting those requires updating the `SiblingSubgraph` implementation. See <https://github.com/CQCL/hugr/issues/1974>.
 #[derive(Debug, Clone, Default)]
@@ -47,17 +58,16 @@ pub enum UntupleError {
 /// Result type for the untuple pass.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct UntupleResult {
-    /// Number of `MakeTuple` rewrites applied.
+    /// Number of tuple pack/unpack rewrites applied.
     pub rewrites_applied: usize,
 }
 
 impl UntuplePass {
-    /// Find tuple pack operations followed by tuple unpack operations
-    /// and generate rewrites to remove them.
+    /// Find redundant tuple pack/unpack operations in either order and generate
+    /// rewrites to remove them.
     ///
-    /// The returned rewrites are guaranteed to be independent of each other.
-    ///
-    /// Returns an iterator over the rewrites.
+    /// The returned rewrites are guaranteed to be independent of each other;
+    /// overlapping matches are left for subsequent iterations of the pass.
     pub fn all_rewrites<H: HugrView<Node = Node>>(
         &self,
         hugr: &H,
@@ -83,10 +93,23 @@ fn find_rewrites<H: HugrView>(
         // Reset for each parent as `SchedGraphChecker` and all `HugrConvexChecker`s
         // are tied to a specific parent node.
         let mut convex_checker: Option<SchedGraphChecker<H>> = None;
+        let mut rewritten_nodes: FxHashSet<H::Node> = FxHashSet::default();
 
         for node in hugr.children(parent) {
+            // Avoid constructing a rewrite for a node already scheduled for removal.
+            if rewritten_nodes.contains(&node) {
+                continue;
+            }
             let op = hugr.get_optype(node);
-            if let Some(rw) = make_rewrite(hugr, &mut convex_checker, node, op) {
+            let rewrite = if is_make_tuple(op) {
+                make_pack_unpack_rewrite(hugr, &mut convex_checker, node, &rewritten_nodes)
+            } else if is_unpack_tuple(op) {
+                make_unpack_pack_rewrite(hugr, &mut convex_checker, node, &rewritten_nodes)
+            } else {
+                None
+            };
+            if let Some(rw) = rewrite {
+                rewritten_nodes.extend(rw.subgraph().nodes().iter().copied());
                 res.push(rw);
             }
             if recursive && op.is_container() {
@@ -102,11 +125,19 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for UntuplePass {
     type Result = UntupleResult;
 
     fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
-        let rewrites = self.all_rewrites(hugr);
-        let rewrites_applied = rewrites.len();
-        // The rewrites are independent, so we can always apply them all.
-        for rewrite in rewrites {
-            hugr.apply_patch(rewrite)?;
+        let mut rewrites_applied = 0;
+        loop {
+            let rewrites = self.all_rewrites(hugr);
+            if rewrites.is_empty() {
+                break;
+            }
+            rewrites_applied += rewrites.len();
+            // The rewrites are independent, so we can always apply them all.
+            for rewrite in rewrites {
+                hugr.apply_patch(rewrite)?;
+            }
+            // Removing a pair can expose another pair, e.g. when tuples are nested.
+            // Each rewrite removes at least one node, so this terminates.
         }
         Ok(UntupleResult { rewrites_applied })
     }
@@ -133,36 +164,32 @@ fn is_unpack_tuple(optype: &OpType) -> bool {
     optype.cast::<UnpackTuple>().is_some()
 }
 
+/// Returns whether the node has any incident order edges.
+fn has_order_edges<H: HugrView>(hugr: &H, node: H::Node) -> bool {
+    let op = hugr.get_optype(node);
+    let has_input_order = op
+        .other_input_port()
+        .and_then(|p| hugr.linked_outputs(node, p).next())
+        .is_some();
+    let has_output_order = op
+        .other_output_port()
+        .and_then(|p| hugr.linked_inputs(node, p).next())
+        .is_some();
+    has_input_order || has_output_order
+}
+
 /// If this is a `MakeTuple` operation followed by some number of `UnpackTuple` operations
 /// on the same region, return a rewrite to remove them.
 ///
 /// Otherwise, return None.
-fn make_rewrite<'h, T: HugrView>(
+fn make_pack_unpack_rewrite<'h, T: HugrView>(
     hugr: &'h T,
     convex_checker: &mut Option<SchedGraphChecker<'h, T>>,
     node: T::Node,
-    op: &OpType,
+    rewritten_nodes: &FxHashSet<T::Node>,
 ) -> Option<SimpleReplacement<T::Node>> {
-    // Only process MakeTuple operations
-    if !is_make_tuple(op) {
-        return None;
-    }
-
-    let has_order_edges = |node: T::Node| -> bool {
-        let op = hugr.get_optype(node);
-        let has_input_order = op
-            .other_input_port()
-            .and_then(|p| hugr.linked_outputs(node, p).next())
-            .is_some();
-        let has_output_order = op
-            .other_output_port()
-            .and_then(|p| hugr.linked_inputs(node, p).next())
-            .is_some();
-        has_input_order || has_output_order
-    };
-
     // If the node has order edges, ignore it.
-    if has_order_edges(node) {
+    if has_order_edges(hugr, node) {
         return None;
     }
 
@@ -179,12 +206,16 @@ fn make_rewrite<'h, T: HugrView>(
         .iter()
         .filter(|&&neigh| hugr.get_parent(neigh) == node_parent)
         .filter(|&&neigh| is_unpack_tuple(hugr.get_optype(neigh)))
-        .filter(|&&neigh| !has_order_edges(neigh))
+        .filter(|&&neigh| !has_order_edges(hugr, neigh))
         .copied()
         .collect_vec();
 
     // If there are no unpacks but the tuple is being used, there's nothing to do.
     if unpack_nodes.is_empty() && !links.is_empty() {
+        return None;
+    }
+    // Reject overlaps before constructing the subgraph and replacement HUGR.
+    if unpack_nodes.iter().any(|n| rewritten_nodes.contains(n)) {
         return None;
     }
 
@@ -198,6 +229,89 @@ fn make_rewrite<'h, T: HugrView>(
         unpack_nodes,
         num_other_outputs,
     ))
+}
+
+/// Remove repacks of all the fields of an `UnpackTuple`, in their original order.
+fn make_unpack_pack_rewrite<'h, T: HugrView>(
+    hugr: &'h T,
+    convex_checker: &mut Option<SchedGraphChecker<'h, T>>,
+    unpack_node: T::Node,
+    rewritten_nodes: &FxHashSet<T::Node>,
+) -> Option<SimpleReplacement<T::Node>> {
+    if has_order_edges(hugr, unpack_node) {
+        return None;
+    }
+
+    let tuple_types = hugr
+        .out_value_types(unpack_node)
+        .map(|(_, ty)| ty)
+        .collect_vec();
+    let parent = hugr.get_parent(unpack_node)?;
+    // Any repack must consume the first field. Empty tuples have no fields
+    // connecting the unpack to a pack, so cannot be matched this way.
+    if tuple_types.is_empty() {
+        return None;
+    }
+    let pack_nodes = hugr
+        .linked_inputs(unpack_node, 0)
+        .filter_map(|(node, port)| {
+            (port.index() == 0
+                && hugr.get_parent(node) == Some(parent)
+                && is_make_tuple(hugr.get_optype(node))
+                && !has_order_edges(hugr, node)
+                && hugr.in_value_types(node).count() == tuple_types.len()
+                && (0..tuple_types.len())
+                    .all(|i| hugr.single_linked_output(node, i) == Some((unpack_node, i.into()))))
+            .then_some(node)
+        })
+        .collect_vec();
+    if pack_nodes.is_empty() {
+        return None;
+    }
+    // The anchor may be free even when one of its repacks is already selected.
+    if pack_nodes.iter().any(|n| rewritten_nodes.contains(n)) {
+        return None;
+    }
+
+    let checker =
+        convex_checker.get_or_insert_with(|| SchedGraphChecker::new(hugr.scheduling_graph(parent)));
+    let nodes = std::iter::once(unpack_node).chain(pack_nodes).collect_vec();
+    let subgraph = SiblingSubgraph::try_from_nodes_with_checker(nodes, hugr, checker).unwrap();
+    let retain_unpack = subgraph
+        .outgoing_ports()
+        .iter()
+        .any(|(node, _)| *node == unpack_node);
+    // Passing the original tuple through while also unpacking it for other
+    // field consumers would copy it, which is invalid for a linear tuple.
+    if retain_unpack && !tuple_types.iter().all(Type::copyable) {
+        return None;
+    }
+    let mut replacement = FunctionBuilder::new("<repl>", subgraph.poly_func_type(hugr)).unwrap();
+    let [tuple] = replacement.input_wires_arr();
+
+    // Keep an unpack only if some fields are used outside the removed repacks.
+    let fields = if retain_unpack {
+        replacement
+            .add_dataflow_op(UnpackTuple::new(tuple_types.into()), [tuple])
+            .unwrap()
+            .outputs()
+            .collect_vec()
+    } else {
+        vec![]
+    };
+    let outputs = subgraph.outgoing_ports().iter().map(|&(node, port)| {
+        if node == unpack_node {
+            fields[port.index()]
+        } else {
+            tuple
+        }
+    });
+    let replacement = replacement.finish_hugr_with_outputs(outputs).unwrap();
+    Some(
+        subgraph
+            .create_simple_replacement(hugr, replacement)
+            .unwrap(),
+    )
 }
 
 /// Returns a rewrite to remove a tuple pack operation that's followed by unpack operations,
@@ -264,8 +378,9 @@ mod test {
     use super::*;
     use crate::passes::composable::WithScope;
     use hugr_core::Hugr;
-    use hugr_core::builder::{DFGBuilder, FunctionBuilder};
+    use hugr_core::builder::{DFGBuilder, DataflowSubContainer, FunctionBuilder};
     use hugr_core::extension::prelude::{UnpackTuple, bool_t, qb_t};
+    use hugr_core::hugr::internal::HugrMutInternals;
     use hugr_core::ops::handle::NodeHandle;
     use hugr_core::std_extensions::arithmetic::float_types::float64_type;
     use hugr_core::std_extensions::collections::array::array_type_parametric;
@@ -473,16 +588,314 @@ mod test {
         h.finish_hugr_with_outputs([arr, b]).unwrap()
     }
 
+    fn unpack_repack(types: Vec<Type>, packs: usize, extra_field: Option<usize>) -> Hugr {
+        let tuple_type = Type::new_tuple(types.clone());
+        let mut outputs = vec![tuple_type.clone(); packs];
+        outputs.extend(extra_field.map(|i| types[i].clone()));
+        let mut h = DFGBuilder::new(Signature::new(vec![tuple_type], outputs)).unwrap();
+        let [tuple] = h.input_wires_arr();
+        let fields = h
+            .add_dataflow_op(UnpackTuple::new(types.into()), [tuple])
+            .unwrap()
+            .outputs()
+            .collect_vec();
+        let mut outputs = (0..packs)
+            .map(|_| h.make_tuple(fields.iter().copied()).unwrap())
+            .collect_vec();
+        outputs.extend(extra_field.map(|i| fields[i]));
+        h.finish_hugr_with_outputs(outputs).unwrap()
+    }
+
+    #[rstest]
+    #[case::linear(vec![qb_t(), bool_t()], 1, None)]
+    #[case::singleton(vec![qb_t()], 1, None)]
+    #[case::multiple_repacks(vec![bool_t(), bool_t()], 3, None)]
+    #[case::extra_field_use(vec![bool_t(), bool_t()], 2, Some(1))]
+    fn test_unpack_repack(
+        #[case] types: Vec<Type>,
+        #[case] packs: usize,
+        #[case] extra_field: Option<usize>,
+    ) {
+        let mut hugr = unpack_repack(types, packs, extra_field);
+        hugr.validate().unwrap();
+        let pass = UntuplePass::default();
+        assert_eq!(pass.run(&mut hugr).unwrap().rewrites_applied, 1);
+        hugr.validate().unwrap();
+
+        let [input, output] = hugr.get_io(hugr.entrypoint()).unwrap();
+        for i in 0..packs {
+            assert_eq!(
+                hugr.single_linked_output(output, i),
+                Some((input, 0.into()))
+            );
+        }
+        if let Some(field) = extra_field {
+            let (unpack, port) = hugr.single_linked_output(output, packs).unwrap();
+            assert!(is_unpack_tuple(hugr.get_optype(unpack)));
+            assert_eq!(port.index(), field);
+            assert_eq!(
+                hugr.single_linked_output(unpack, 0),
+                Some((input, 0.into()))
+            );
+        }
+        assert_eq!(
+            hugr.children(hugr.entrypoint()).count(),
+            2 + usize::from(extra_field.is_some())
+        );
+        assert_eq!(pass.run(&mut hugr).unwrap().rewrites_applied, 0);
+    }
+
+    #[test]
+    fn test_unpack_repack_with_linear_tuple_and_extra_field_use() {
+        let mut hugr = unpack_repack(vec![qb_t(), bool_t()], 1, Some(1));
+        hugr.validate().unwrap();
+        let original = hugr.clone();
+        // The extra boolean use requires retaining the unpack. Bypassing the
+        // repack would then duplicate the input tuple, including its qubit.
+        assert_eq!(
+            UntuplePass::default()
+                .run(&mut hugr)
+                .unwrap()
+                .rewrites_applied,
+            0
+        );
+        assert_eq!(hugr, original);
+    }
+
+    #[rstest]
+    #[case::reordered(vec![(0, 1), (0, 0)])]
+    #[case::duplicated(vec![(0, 0), (0, 0)])]
+    #[case::mixed_tuples(vec![(0, 0), (1, 1)])]
+    #[case::partial(vec![(0, 0)])]
+    #[case::extra_field(vec![(0, 0), (0, 1), (0, 1)])]
+    fn test_non_identity_repack(#[case] sources: Vec<(usize, usize)>) {
+        let tuple_type = Type::new_tuple(vec![bool_t(), bool_t()]);
+        let mut h = DFGBuilder::new(Signature::new(
+            vec![tuple_type.clone(), tuple_type],
+            vec![Type::new_tuple(vec![bool_t(); sources.len()])],
+        ))
+        .unwrap();
+        let fields = h
+            .input_wires()
+            .collect_vec()
+            .into_iter()
+            .map(|tuple| {
+                h.add_dataflow_op(UnpackTuple::new(vec![bool_t(), bool_t()].into()), [tuple])
+                    .unwrap()
+                    .outputs()
+                    .collect_vec()
+            })
+            .collect_vec();
+        let packed = h
+            .make_tuple(
+                sources
+                    .into_iter()
+                    .map(|(tuple, field)| fields[tuple][field]),
+            )
+            .unwrap();
+        let mut hugr = h.finish_hugr_with_outputs([packed]).unwrap();
+        hugr.validate().unwrap();
+        let original = hugr.clone();
+        assert_eq!(
+            UntuplePass::default()
+                .run(&mut hugr)
+                .unwrap()
+                .rewrites_applied,
+            0
+        );
+        assert_eq!(hugr, original);
+    }
+
+    #[rstest]
+    #[case::unpack_incoming(false, false)]
+    #[case::unpack_outgoing(false, true)]
+    #[case::pack_incoming(true, false)]
+    #[case::pack_outgoing(true, true)]
+    fn test_ordered_unpack_repack(#[case] pack: bool, #[case] outgoing: bool) {
+        let mut hugr = unpack_repack(vec![qb_t(), bool_t()], 1, None);
+        let [input, output] = hugr.get_io(hugr.entrypoint()).unwrap();
+        let node = hugr
+            .children(hugr.entrypoint())
+            .find(|&n| {
+                if pack {
+                    is_make_tuple(hugr.get_optype(n))
+                } else {
+                    is_unpack_tuple(hugr.get_optype(n))
+                }
+            })
+            .unwrap();
+        if outgoing {
+            hugr.add_other_edge(node, output);
+        } else {
+            hugr.add_other_edge(input, node);
+        }
+        hugr.validate().unwrap();
+        let original = hugr.clone();
+        assert_eq!(
+            UntuplePass::default()
+                .run(&mut hugr)
+                .unwrap()
+                .rewrites_applied,
+            0
+        );
+        assert_eq!(hugr, original);
+    }
+
+    #[test]
+    fn test_nested_unpack_repack() {
+        let inner_types = vec![qb_t(), bool_t()];
+        let outer_types = vec![Type::new_tuple(inner_types.clone()), bool_t()];
+        let mut h = DFGBuilder::new(Signature::new_endo(vec![Type::new_tuple(
+            outer_types.clone(),
+        )]))
+        .unwrap();
+        let [tuple] = h.input_wires_arr();
+        let [inner, b] = h
+            .add_dataflow_op(UnpackTuple::new(outer_types.into()), [tuple])
+            .unwrap()
+            .outputs_arr();
+        let [q, b_inner] = h
+            .add_dataflow_op(UnpackTuple::new(inner_types.into()), [inner])
+            .unwrap()
+            .outputs_arr();
+        let inner = h.make_tuple([q, b_inner]).unwrap();
+        let tuple = h.make_tuple([inner, b]).unwrap();
+        let mut hugr = h.finish_hugr_with_outputs([tuple]).unwrap();
+        assert_eq!(
+            UntuplePass::default()
+                .run(&mut hugr)
+                .unwrap()
+                .rewrites_applied,
+            2
+        );
+        hugr.validate().unwrap();
+        assert_eq!(hugr.children(hugr.entrypoint()).count(), 2);
+    }
+
+    #[rstest]
+    #[case::pack_unpack_repack(false, false)]
+    #[case::pack_unpack_repack_middle_first(false, true)]
+    #[case::unpack_pack_unpack(true, false)]
+    #[case::unpack_pack_unpack_middle_first(true, true)]
+    fn test_overlapping_rewrites(#[case] unpack_first: bool, #[case] middle_first: bool) {
+        let fields = vec![qb_t(), bool_t()];
+        let tuple = vec![Type::new_tuple(fields.clone())];
+        let signature = if unpack_first {
+            Signature::new(tuple, fields.clone())
+        } else {
+            Signature::new(fields.clone(), tuple)
+        };
+        let mut h = DFGBuilder::new(signature).unwrap();
+        let mut wires = h.input_wires().collect_vec();
+        let mut nodes = Vec::new();
+        for unpack in [unpack_first, !unpack_first, unpack_first] {
+            wires = if unpack {
+                h.add_dataflow_op(UnpackTuple::new(fields.clone().into()), wires)
+                    .unwrap()
+                    .outputs()
+                    .collect_vec()
+            } else {
+                vec![h.make_tuple(wires).unwrap()]
+            };
+            nodes.push(wires[0].node());
+        }
+        let mut hugr = h.finish_hugr_with_outputs(wires).unwrap();
+        if middle_first {
+            // Visit the middle node first so a later candidate has a free
+            // anchor but overlaps a previously selected neighbouring node.
+            hugr.move_before_sibling(nodes[1], nodes[0]);
+        }
+        let pass = UntuplePass::default();
+        let rewrites = pass.all_rewrites(&hugr);
+        // The two possible rewrites overlap, so only one may be returned.
+        assert_eq!(rewrites.len(), 1);
+        let selected = rewrites[0].subgraph().nodes();
+        assert!(selected.contains(&nodes[1]));
+        assert!(selected.contains(&nodes[if middle_first { 2 } else { 0 }]));
+        for rewrite in rewrites {
+            hugr.apply_patch(rewrite).unwrap();
+        }
+        hugr.validate().unwrap();
+        assert_eq!(hugr.children(hugr.entrypoint()).count(), 3);
+        assert_eq!(pass.run(&mut hugr).unwrap().rewrites_applied, 0);
+    }
+
+    #[rstest]
+    #[case::flat(PassScope::EntrypointFlat, 0)]
+    #[case::recursive(PassScope::EntrypointRecursive, 1)]
+    #[case::global(PassScope::default(), 1)]
+    fn test_unpack_repack_scope(#[case] scope: PassScope, #[case] expected: usize) {
+        let types = vec![qb_t(), bool_t()];
+        let signature = Signature::new_endo(vec![Type::new_tuple(types.clone())]);
+        let mut h = FunctionBuilder::new("main", signature.clone()).unwrap();
+        let mut inner = h.dfg_builder(signature, h.input_wires()).unwrap();
+        let [tuple] = inner.input_wires_arr();
+        let fields = inner
+            .add_dataflow_op(UnpackTuple::new(types.into()), [tuple])
+            .unwrap()
+            .outputs()
+            .collect_vec();
+        let tuple = inner.make_tuple(fields).unwrap();
+        let [tuple] = inner.finish_with_outputs([tuple]).unwrap().outputs_arr();
+        let mut hugr = h.finish_hugr_with_outputs([tuple]).unwrap();
+        assert_eq!(
+            UntuplePass::default_with_scope(scope)
+                .run(&mut hugr)
+                .unwrap()
+                .rewrites_applied,
+            expected
+        );
+        hugr.validate().unwrap();
+    }
+
+    #[test]
+    fn test_unpack_repack_type_parameters() {
+        let arr_type =
+            array_type_parametric(TypeArg::new_var_use(0, TypeParam::max_nat_kind()), bool_t())
+                .unwrap();
+        let fields = vec![arr_type, bool_t()];
+        let mut h = FunctionBuilder::new(
+            "main",
+            PolyFuncType::new(
+                vec![TypeParam::max_nat_kind()],
+                Signature::new_endo(vec![Type::new_tuple(fields.clone())]),
+            ),
+        )
+        .unwrap();
+        let [tuple] = h.input_wires_arr();
+        let fields = h
+            .add_dataflow_op(UnpackTuple::new(fields.into()), [tuple])
+            .unwrap()
+            .outputs()
+            .collect_vec();
+        let tuple = h.make_tuple(fields).unwrap();
+        let mut hugr = h.finish_hugr_with_outputs([tuple]).unwrap();
+        assert_eq!(
+            UntuplePass::default()
+                .run(&mut hugr)
+                .unwrap()
+                .rewrites_applied,
+            1
+        );
+        hugr.validate().unwrap();
+        assert_eq!(hugr.children(hugr.entrypoint()).count(), 2);
+    }
+
     #[rstest]
     #[case::unused(unused_pack(), 1, 2)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case::simple(simple_pack_unpack(), 1, 2)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case::multi(multi_unpack(), 1, 2)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case::partial(partial_unpack(), 1, 3)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case::unpack_discard_first(unpack_discard_first(), 1, 2)]
     // Nodes with order edges are ignored.
     #[case::ordered(ordered_pack_unpack(), 0, 4)]
     #[case::outgoing_ordered(outgoing_ordered_pack_unpack(), 0, 4)]
     #[case::incoming_ordered(incoming_ordered_pack_unpack(), 0, 4)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case::type_parameters(unpack_type_parameters(), 1, 2)]
     fn test_pack_unpack(
         #[case] mut hugr: Hugr,
@@ -492,6 +905,7 @@ mod test {
         let parent = hugr.entrypoint();
         let pass = UntuplePass::default().with_scope(PassScope::EntrypointFlat);
         let res = pass.run(&mut hugr).unwrap_or_else(|e| panic!("{e}"));
+        hugr.validate().unwrap();
         assert_eq!(res.rewrites_applied, expected_rewrites);
         assert_eq!(hugr.children(parent).count(), remaining_nodes);
     }

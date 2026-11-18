@@ -272,9 +272,10 @@ Rust pre-release versions should be formatted as `0.1.0-alpha.1` (or `-beta`, or
 
 ### Python package release
 
-Python releases are managed by `release-please`. This tool always bumps the
-minor version (or the pre-release version if the previous version was a
-pre-release).
+Python releases are managed by `release-please`, which determines version bumps
+from conventional commit messages.
+
+The `tket` wheel includes Rust code outside `tket/tket-py`, so the generated changelogs will include changes that only modify the rust projects.
 
 To override the version getting released, you must merge a PR to `main` containing
 `Release-As: 0.1.0` in the description.

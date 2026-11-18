@@ -4,7 +4,7 @@
 //!   and the target BB has no other predecessors.
 //! * Move entry/last-before-exit blocks outside of CFG when possible.
 //! * Convert whole CFG to DFG if straight-line control-flow
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 use hugr_core::extension::prelude::UnpackTuple;
 use hugr_core::hugr::hugrmut::HugrMut;
@@ -37,8 +37,8 @@ pub fn merge_basic_blocks<H: HugrMut>(cfg: &mut H) -> Result<usize, NormalizeCFG
         return Err(NormalizeCFGError::NotCFG(cfg.entrypoint_optype().tag()));
     }
     let mut num_merged = 0;
-    let mut worklist = cfg.children(cfg.entrypoint()).collect::<Vec<_>>();
-    while let Some(n) = worklist.pop() {
+    let mut worklist = cfg.children(cfg.entrypoint()).collect::<BTreeSet<_>>();
+    while let Some(n) = worklist.pop_last() {
         // Consider merging n with its successor
         let Ok(succ) = cfg.output_neighbours(n).exactly_one() else {
             continue;
@@ -54,13 +54,16 @@ pub fn merge_basic_blocks<H: HugrMut>(cfg: &mut H) -> Result<usize, NormalizeCFG
         }
         num_merged += 1;
         let (rep, merge_bb, dfgs) = mk_rep(cfg, n, succ);
+        // The replacement removes both blocks. Drop the successor from the
+        // worklist before later rewrites can reuse its node index.
+        worklist.remove(&succ);
         let node_map = cfg.apply_patch(rep).unwrap();
         let merged_bb = *node_map.get(&merge_bb).unwrap();
         for dfg_id in dfgs {
             let n_id = *node_map.get(&dfg_id).unwrap();
             cfg.apply_patch(InlineDFG(n_id.into())).unwrap();
         }
-        worklist.push(merged_bb);
+        worklist.insert(merged_bb);
     }
     Ok(num_merged)
 }
@@ -554,8 +557,65 @@ mod test {
     }
 
     #[rstest]
+    #[case([0, 1, 2])]
+    #[case([0, 2, 1])]
+    #[case([1, 0, 2])]
+    #[case([1, 2, 0])]
+    #[case([2, 0, 1])]
+    #[case([2, 1, 0])]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
+    fn merge_bbs_in_node_order(#[case] order: [usize; 3]) {
+        // Control-flow order need not match node or sibling order. In particular, a
+        // successor may still be on the worklist when it is merged and removed.
+        let mut cfg = CFGBuilder::new(endo_sig([qb_t()])).unwrap();
+        let variants: Vec<TypeRow> = vec![vec![qb_t()].into()];
+        let mut entry = cfg.entry_builder(variants.clone(), type_row![]).unwrap();
+        let n = entry
+            .add_dataflow_op(Noop::new(qb_t()), entry.input_wires())
+            .unwrap();
+        let [br] = entry
+            .add_dataflow_op(Tag::new(0, variants.clone()), n.outputs())
+            .unwrap()
+            .outputs_arr();
+        let entry = entry.finish_with_outputs(br, []).unwrap();
+        let mut blocks = Vec::new();
+        for _ in 0..3 {
+            let mut block = cfg
+                .block_builder(vec![qb_t()].into(), variants.clone(), type_row![])
+                .unwrap();
+            let n = block
+                .add_dataflow_op(Noop::new(qb_t()), block.input_wires())
+                .unwrap();
+            let [br] = block
+                .add_dataflow_op(Tag::new(0, variants.clone()), n.outputs())
+                .unwrap()
+                .outputs_arr();
+            blocks.push(block.finish_with_outputs(br, []).unwrap());
+        }
+        cfg.branch(&entry, 0, &blocks[order[0]]).unwrap();
+        cfg.branch(&blocks[order[0]], 0, &blocks[order[1]]).unwrap();
+        cfg.branch(&blocks[order[1]], 0, &blocks[order[2]]).unwrap();
+        cfg.branch(&blocks[order[2]], 0, &cfg.exit_block()).unwrap();
+        let original = cfg.finish_hugr().unwrap();
+        // Exercise different node-reuse orders in HUGR's replacement code.
+        for _ in 0..64 {
+            let mut h = original.clone();
+            assert_eq!(merge_basic_blocks(&mut h), Ok(3));
+            h.validate().unwrap();
+            assert_eq!(h.children(h.entrypoint()).count(), 2);
+            assert_eq!(
+                h.entry_descendants()
+                    .filter(|n| h.get_optype(*n).cast::<Noop>().is_some())
+                    .count(),
+                4
+            );
+        }
+    }
+
+    #[rstest]
     #[case(true)]
     #[case(false)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn merge_bbs_in_loop(#[case] self_loop: bool) -> Result<(), Box<dyn std::error::Error>> {
         /* self_loop==False:
            -> Noop1 -----> Test -> Exit       -> Noop1AndTest --> Exit
@@ -655,6 +715,7 @@ mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn elide_triple_with_permute() -> Result<(), Box<dyn std::error::Error>> {
         // Blocks are just BB1 -> BB2 -> BB3 --> Exit.
         // Should be merged into one BB (we don't check that specifically)
@@ -738,6 +799,7 @@ mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn entry_before_loop() -> Result<(), Box<dyn std::error::Error>> {
         /* -> Noop --> Test -> Exit      -> Test --> Exit
                        |  |          =>     |  |
@@ -873,6 +935,7 @@ mod test {
     }
 
     #[rstest]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn nested_cfgs_pass(#[values(true, false)] nonlocal: bool) {
         //  --> Entry --> Loop --> Tail --> EXIT
         //        |       /  \
@@ -1031,6 +1094,7 @@ mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn order_edges() {
         // BB1 -> BB2 -> Exit    =>   DFG
         // ...where each BB has an Input->result->Output chain of order edges
@@ -1100,6 +1164,7 @@ mod test {
     }
 
     #[rstest]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn order_edges_loop_after() {
         // entry_bb -> loop_bb -> Exit
         //              /   \
@@ -1161,6 +1226,7 @@ mod test {
     }
 
     #[rstest]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn order_edges_loop_before() {
         // loop_bb -> BB1 -> Exit
         //  /   \

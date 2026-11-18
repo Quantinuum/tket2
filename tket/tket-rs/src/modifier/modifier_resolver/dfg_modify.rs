@@ -1,6 +1,6 @@
 //! Modifier for dataflow blocks.
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{BTreeSet, HashMap, HashSet, VecDeque},
     iter, mem,
 };
 
@@ -25,7 +25,7 @@ use hugr::{
 };
 use petgraph::visit::{Topo, Walker};
 
-use crate::extension::modifier::Modifier;
+use crate::extension::{global_phase::GlobalPhase, modifier::Modifier};
 
 use super::{DirWire, ModifierResolver, ModifierResolverErrors, PortExt};
 
@@ -348,9 +348,11 @@ impl<N: HugrNode> ModifierResolver<N> {
         if !concrete_signature_has_quantum_data
             && !self.signature_has_quantum_data(fn_defn.signature().body())
         {
+            // A classical signature can hide modifiers inside the unchanged body.
+            self.new_callees.push(func);
             return Ok(None);
         }
-        Ok(Some(self.modify_fn(h, func)?))
+        Ok(Some(self.modify_fn_inner(h, func)?))
     }
 
     /// Looks up a user-provided custom implementation of `func` for the current modifier.
@@ -426,6 +428,8 @@ impl<N: HugrNode> ModifierResolver<N> {
         custom_func: N,
     ) -> Result<N, ModifierResolverErrors<N>> {
         self.modified_functions.insert(original_func);
+        // The selected body is reused, not rebuilt, so its modifiers still need discovery.
+        self.new_callees.push(custom_func);
         if self.control_num() == 0 {
             let original_defn = h.get_optype(original_func).as_func_defn().ok_or_else(|| {
                 ModifierResolverErrors::unreachable(format!(
@@ -673,7 +677,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         n: N,
         new_dfg: &mut impl Container,
     ) -> Result<Node, ModifierResolverErrors<N>> {
-        let nodes = h.descendants(n).collect::<HashSet<_>>();
+        let nodes = h.descendants(n).collect::<BTreeSet<_>>();
 
         let static_edges = nodes
             .iter()
@@ -704,6 +708,8 @@ impl<N: HugrNode> ModifierResolver<N> {
         for (source, old_target, target_port) in static_edges {
             let new_target = insertion_result.node_map.get(&old_target).copied().unwrap();
             self.call_map_insert(source, (new_target, target_port));
+            // Copying the container does not resolve modifiers inside its callees.
+            self.new_callees.push(source);
         }
 
         Ok(new_node)
@@ -716,12 +722,15 @@ impl<N: HugrNode> ModifierResolver<N> {
         dfg: &DFG,
         new_parent_dfg: &mut impl Container,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        // Check if the DFG input or output are carrying qubits
+        // Global phases can require modification even with a classical boundary.
         let boundary_has_qubits = self.signature_has_quantum_data(&dfg.signature);
-        if !boundary_has_qubits {
-            // If the DFG does not carry qubits, we still modify its body in case it contains modifier nodes.
-            // Since there are no input/output qubits, modifiers inside the DFG cannot affect the outside of
-            // the DFG, so we can safely resolve them without worrying about the surrounding context.
+        if !boundary_has_qubits
+            && !h
+                .descendants(n)
+                .any(|node| GlobalPhase::from_optype(h.get_optype(node)).is_some())
+        {
+            // Without boundary qubits or global phases, resolve internal modifiers
+            // without propagating the surrounding modifiers into the DFG.
             let new_dfg = self.with_modifiers(Default::default(), |this| {
                 let mut builder = DFGBuilder::new(dfg.signature.clone()).unwrap();
                 this.modify_dfg_body(h, n, &mut builder)?;
@@ -837,12 +846,13 @@ impl<N: HugrNode> ModifierResolver<N> {
         conditional: &Conditional,
         new_dfg: &mut impl Container,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        // A purely classical, modifier-free conditional is unchanged by the
-        // current modifier, so it can be copied without rebuilding its cases.
+        // A conditional without quantum data, modifiers, or global phases is
+        // unchanged by the current modifier, so its cases can be copied.
         let needs_modification = iter::once(n).chain(h.descendants(n)).any(|node| {
             h.signature(node)
                 .is_some_and(|signature| self.signature_has_quantum_data(&signature))
                 || Modifier::from_optype(h.get_optype(node)).is_some()
+                || GlobalPhase::from_optype(h.get_optype(node)).is_some()
         });
         if !needs_modification {
             self.copy_sub_container_no_modification(h, n, new_dfg)?;
@@ -1139,6 +1149,7 @@ where
 mod test {
     use super::super::tests::{
         SetUnitary, modifier_test_hugr, resolved_modifier_test_hugr, test_modifier_resolver,
+        test_resolve,
     };
     use super::super::*;
     use crate::extension::{
@@ -1151,7 +1162,7 @@ mod test {
     use hugr::{
         Hugr,
         builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder, SubContainer},
-        extension::prelude::{ConstUsize, bool_t, qb_t, usize_t},
+        extension::prelude::{ConstUsize, MakeTuple, UnpackTuple, bool_t, qb_t, usize_t},
         extension::simple_op::MakeExtensionOp,
         ops::{
             CallIndirect, ExtensionOp,
@@ -1211,6 +1222,7 @@ mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn repeated_calls_share_modified_implementation() {
         let h = resolved_modifier_test_hugr(
             2,
@@ -1426,6 +1438,149 @@ mod test {
         let modified = resolver.modify_fn(&mut h, original.node()).unwrap();
 
         assert_eq!(modified, custom.node());
+    }
+
+    /// Resolve a chain of private custom dagger implementations with nested modified calls.
+    /// Test that modifier resolution finds the dagger inside the custom implementation
+    #[test]
+    fn pass_resolves_custom_dagger_implementation() {
+        let mut module = ModuleBuilder::new();
+        let signature = Signature::new_endo([qb_t()]);
+        let original = identity_function(&mut module, "original", signature.clone());
+        let leaf = identity_function(&mut module, "leaf", signature.clone());
+        let terminal = identity_function(&mut module, "terminal", signature.clone());
+        let dagger = MODIFIER_EXTENSION
+            .instantiate_extension_op(
+                &DAGGER_OP_ID,
+                [Term::new_list([qb_t()]), Term::new_list(Vec::<Type>::new())],
+            )
+            .unwrap();
+        // main -> dagger(original) selects custom; custom -> dagger(leaf)
+        // selects inner_custom, whose own daggered call must also be resolved.
+        let [
+            (inner_custom, inner_call),
+            (custom, custom_call),
+            (main, main_call),
+        ] = [
+            ("inner_custom", terminal),
+            ("custom", leaf),
+            ("main", original),
+        ]
+        .map(|(name, callee)| {
+            let mut function = module
+                .define_function_vis(name, signature.clone(), hugr_core::Visibility::Private)
+                .unwrap();
+            let [q] = function.input_wires_arr();
+            let loaded = function.load_func(&callee, &[]).unwrap();
+            let modified = function
+                .add_dataflow_op(dagger.clone(), [loaded])
+                .unwrap()
+                .out_wire(0);
+            let call = function
+                .add_dataflow_op(
+                    CallIndirect {
+                        signature: signature.clone(),
+                    },
+                    [modified, q],
+                )
+                .unwrap();
+            (
+                function.finish_with_outputs(call.outputs()).unwrap().node(),
+                call.node(),
+            )
+        });
+        let mut h = module.finish_hugr().unwrap();
+        h.set_entrypoint(main);
+        h.set_metadata::<metadata::DaggeredImplementation>(original.node(), "custom".to_string());
+        h.set_metadata::<metadata::DaggeredImplementation>(leaf.node(), "inner_custom".to_string());
+        test_resolve(&mut h);
+
+        // The outer call uses the custom implementation, whose nested call is also resolved.
+        let loader = h.single_linked_output(main_call, 0).unwrap().0;
+        assert_eq!(h.static_source(loader), Some(custom));
+        let loader = h.single_linked_output(custom_call, 0).unwrap().0;
+        assert_eq!(h.static_source(loader), Some(inner_custom));
+        let loader = h.single_linked_output(inner_call, 0).unwrap().0;
+        let modified_terminal =
+            super::find_module_func_by_name(&h, "__modified__terminal[D]").unwrap();
+        assert_eq!(h.static_source(loader), Some(modified_terminal));
+    }
+
+    /// Retained private callees must be explored even when their calls are copied unchanged.
+    #[rstest::rstest]
+    #[case::classical_indirect_call(false)]
+    #[case::copied_conditional(true)]
+    fn pass_resolves_modifiers_in_retained_callees(#[case] in_conditional: bool) {
+        let (mut h, _) = modifier_test_hugr(
+            1,
+            0,
+            |module, _| {
+                let leaf = identity_function(module, "leaf", Signature::new_endo([qb_t()]));
+                let mut callee = module
+                    .define_function("classical", Signature::new_endo([]))
+                    .unwrap();
+                let loaded = callee.load_func(&leaf, &[]).unwrap();
+                let dagger = MODIFIER_EXTENSION
+                    .instantiate_extension_op(
+                        &DAGGER_OP_ID,
+                        [Term::new_list([qb_t()]), Term::new_list(Vec::<Type>::new())],
+                    )
+                    .unwrap();
+                let modified = callee
+                    .add_dataflow_op(dagger, [loaded])
+                    .unwrap()
+                    .out_wire(0);
+                let q = callee
+                    .add_dataflow_op(TketOp::QAlloc, [])
+                    .unwrap()
+                    .out_wire(0);
+                let q = callee
+                    .add_dataflow_op(
+                        CallIndirect {
+                            signature: Signature::new_endo([qb_t()]),
+                        },
+                        [modified, q],
+                    )
+                    .unwrap()
+                    .out_wire(0);
+                callee.add_dataflow_op(TketOp::QFree, [q]).unwrap();
+                let callee = callee.finish_with_outputs([]).unwrap();
+
+                let mut outer = module
+                    .define_function("outer", Signature::new_endo([qb_t()]))
+                    .unwrap();
+                outer.set_unitary();
+                if in_conditional {
+                    // The conditional has no quantum boundary or local modifier nodes,
+                    // so it is copied wholesale, including its call to `classical`.
+                    let rows = [type_row![], type_row![]];
+                    let condition = outer.make_sum(0, rows.clone(), []).unwrap();
+                    let mut conditional = outer
+                        .conditional_builder((rows, condition), [], type_row![])
+                        .unwrap();
+                    for index in 0..2 {
+                        let mut case = conditional.case_builder(index).unwrap();
+                        case.call(callee.handle(), &[], []).unwrap();
+                        case.finish_with_outputs([]).unwrap();
+                    }
+                    conditional.finish_sub_container().unwrap();
+                } else {
+                    let loaded = outer.load_func(callee.handle(), &[]).unwrap();
+                    outer
+                        .add_dataflow_op(
+                            CallIndirect {
+                                signature: Signature::new_endo([]),
+                            },
+                            [loaded],
+                        )
+                        .unwrap();
+                }
+                let inputs = outer.input_wires();
+                *outer.finish_with_outputs(inputs).unwrap().handle()
+            },
+            true,
+        );
+        test_resolve(&mut h);
     }
 
     #[test]
@@ -1736,7 +1891,7 @@ mod test {
             [array_type(1, qb_t()), qb_t(), usize_t()],
             [array_type(1, qb_t()), qb_t()],
         );
-        {
+        let main = {
             let mut func = module
                 .define_function(
                     "main",
@@ -1770,12 +1925,12 @@ mod test {
                     [controlled, controls, target, index],
                 )
                 .unwrap();
-            func.finish_with_outputs(call.outputs()).unwrap();
-        }
+            func.finish_with_outputs(call.outputs()).unwrap()
+        };
 
         let mut h = module.finish_hugr().unwrap();
-        let entrypoint = h.entrypoint();
-        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        h.set_entrypoint(main.node());
+        test_resolve(&mut h);
         assert_matches!(h.validate(), Ok(()));
     }
 
@@ -1860,7 +2015,7 @@ mod test {
             )
             .unwrap();
 
-        {
+        let main = {
             let mut main = module
                 .define_function(
                     "main",
@@ -1892,14 +2047,14 @@ mod test {
                     [daggered, inner_controls, target, classical],
                 )
                 .unwrap();
-            main.finish_with_outputs(call.outputs()).unwrap();
-        }
+            main.finish_with_outputs(call.outputs()).unwrap()
+        };
 
         let mut h = module.finish_hugr().unwrap();
+        h.set_entrypoint(main.node());
         assert_matches!(h.validate(), Ok(()));
 
-        let entrypoint = h.entrypoint();
-        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        test_resolve(&mut h);
         assert_matches!(h.validate(), Ok(()));
     }
 
@@ -1985,7 +2140,7 @@ mod test {
             )
             .unwrap();
 
-        {
+        let main = {
             let mut main = module
                 .define_function(
                     "main",
@@ -2017,20 +2172,21 @@ mod test {
                     [daggered, inner_controls, target, classical],
                 )
                 .unwrap();
-            main.finish_with_outputs(call.outputs()).unwrap();
-        }
+            main.finish_with_outputs(call.outputs()).unwrap()
+        };
 
         let mut h = module.finish_hugr().unwrap();
+        h.set_entrypoint(main.node());
         assert_matches!(h.validate(), Ok(()));
 
-        let entrypoint = h.entrypoint();
-        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        test_resolve(&mut h);
         assert_matches!(h.validate(), Ok(()));
     }
 
     #[test]
     /// Test that modifying a DFG representing a computation with no quantum effects (no input/output qubits)
     /// does not introduce invalid hugr.
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn daggered_controlled_rotation_is_acyclic() {
         let mut module = ModuleBuilder::new();
         let inner_sig = Signature::new_endo([qb_t()]);
@@ -2119,7 +2275,7 @@ mod test {
             func.finish_with_outputs([control, target]).unwrap()
         };
 
-        {
+        let main = {
             let mut func = module.define_function("main", main_sig).unwrap();
             let loaded = func.load_func(outer.handle(), &[]).unwrap();
             let daggered = func
@@ -2143,12 +2299,12 @@ mod test {
                 )
                 .unwrap()
                 .outputs();
-            func.finish_with_outputs(outputs).unwrap();
-        }
+            func.finish_with_outputs(outputs).unwrap()
+        };
 
         let mut h = module.finish_hugr().unwrap();
-        let entrypoint = h.entrypoint();
-        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        h.set_entrypoint(main.node());
+        test_resolve(&mut h);
         assert_matches!(h.validate(), Ok(()));
     }
 
@@ -2343,6 +2499,50 @@ mod test {
         *func.finish_with_outputs(inputs).unwrap().handle()
     }
 
+    fn foo_tuple_ops(module: &mut ModuleBuilder<Hugr>, t_num: usize) -> FuncID<true> {
+        assert_eq!(t_num, 2);
+
+        let tuple_types = vec![qb_t(); t_num];
+        let mut func = module
+            .define_function("foo", Signature::new_endo(tuple_types.clone()))
+            .unwrap();
+        func.set_unitary();
+        let inputs: Vec<_> = func.input_wires().collect();
+
+        let tuple = func
+            .add_dataflow_op(MakeTuple::new(tuple_types.clone().into()), inputs)
+            .unwrap()
+            .out_wire(0);
+        let outputs = func
+            .add_dataflow_op(UnpackTuple::new(tuple_types.into()), [tuple])
+            .unwrap()
+            .outputs();
+
+        *func.finish_with_outputs(outputs).unwrap().handle()
+    }
+
+    fn foo_mixed_tuple_ops(module: &mut ModuleBuilder<Hugr>, t_num: usize) -> FuncID<true> {
+        assert_eq!(t_num, 1);
+
+        let tuple_types = vec![qb_t(), usize_t()];
+        let mut func = module
+            .define_function("foo", Signature::new_endo(vec![qb_t()]))
+            .unwrap();
+        func.set_unitary();
+        let qubit = func.input_wires().next().unwrap();
+        let one = func.add_load_value(ConstUsize::new(1));
+
+        let tuple = func
+            .add_dataflow_op(MakeTuple::new(tuple_types.clone().into()), [qubit, one])
+            .unwrap()
+            .out_wire(0);
+        let qubit = func
+            .add_dataflow_op(UnpackTuple::new(tuple_types.into()), [tuple])
+            .unwrap()
+            .out_wire(0);
+
+        *func.finish_with_outputs([qubit]).unwrap().handle()
+    }
     fn foo_non_quantum_array_ops(module: &mut ModuleBuilder<Hugr>, t_num: usize) -> FuncID<true> {
         assert_eq!(t_num, 1);
 
@@ -2455,6 +2655,54 @@ mod test {
         *func.finish_with_outputs([q]).unwrap().handle()
     }
 
+    #[rstest::rstest]
+    #[case::dfg(false)]
+    #[case::conditional(true)]
+    fn control_global_phase_in_classical_container(#[case] conditional: bool) {
+        let h = resolved_modifier_test_hugr(
+            1,
+            1,
+            |module, _| {
+                let mut func = module
+                    .define_function("foo", Signature::new_endo([qb_t()]))
+                    .unwrap();
+                func.set_unitary();
+                let [q] = func.input_wires_arr();
+                let mut dfg = func.dfg_builder(Signature::new_endo([]), []).unwrap();
+                if conditional {
+                    let sum = dfg.make_sum(1, [type_row![], type_row![]], []).unwrap();
+                    let mut cond = dfg
+                        .conditional_builder(([type_row![], type_row![]], sum), [], type_row![])
+                        .unwrap();
+                    cond.case_builder(0)
+                        .unwrap()
+                        .finish_with_outputs([])
+                        .unwrap();
+                    let mut case = cond.case_builder(1).unwrap();
+                    let angle = case.add_load_value(ConstRotation::new(0.5).unwrap());
+                    case.add_dataflow_op(GlobalPhase, [angle]).unwrap();
+                    case.finish_with_outputs([]).unwrap();
+                    cond.finish_sub_container().unwrap();
+                } else {
+                    let angle = dfg.add_load_value(ConstRotation::new(0.5).unwrap());
+                    dfg.add_dataflow_op(GlobalPhase, [angle]).unwrap();
+                }
+                dfg.finish_with_outputs([]).unwrap();
+                *func.finish_with_outputs([q]).unwrap().handle()
+            },
+            false,
+        );
+
+        // The phase must become a rotation on the control, even though its
+        // enclosing containers originally had no quantum inputs or outputs.
+        assert_eq!(
+            h.nodes()
+                .filter(|node| TketOp::from_optype(h.get_optype(*node)) == Some(TketOp::Rz))
+                .count(),
+            1
+        );
+    }
+
     /// Test pass on a DFG with no quantum signature that contains a modifier (dagger)
     /// (https://github.com/Quantinuum/tket2/issues/1814)
     fn foo_dfg_daggered_empty_indirect_call(
@@ -2525,6 +2773,9 @@ mod test {
     #[case::safe_array_ops_dagger(4, 3, foo_safe_array_ops, true)]
     #[case::nested_safe_array_ops(5, 4, foo_nested_quantum_array_ops, false)]
     #[case::nested_safe_array_ops_dagger(5, 4, foo_nested_quantum_array_ops, true)]
+    #[case::tuple_ops(2, 1, foo_tuple_ops, false)]
+    #[case::tuple_ops_dagger(2, 1, foo_tuple_ops, true)]
+    #[case::mixed_tuple_ops(1, 1, foo_mixed_tuple_ops, false)]
 
     fn test_dfg_modify(
         #[case] t_num: usize,
@@ -2539,8 +2790,7 @@ mod test {
         h: &mut Hugr,
         expected: &str,
     ) -> Result<(), ModifierResolverErrors> {
-        let entrypoint = h.entrypoint();
-        match resolve_modifier_with_entrypoints(h, [entrypoint]) {
+        match resolve_modifier(h, &PassScope::default()) {
             Err(ModifierResolverErrors::UnResolvable { msg, .. }) => {
                 assert_eq!(msg, expected);
                 Ok(())
@@ -2553,13 +2803,16 @@ mod test {
     }
 
     #[rstest::rstest]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case::cfg_branching(
         1,
         1,
         foo_cfg_branching,
         "CFG with more than one node cannot be daggered."
     )]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case::cfg_loop(1, 1, foo_cfg_loop, "CFG with more than one node cannot be daggered.")]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case::tail_loop(1, 1, foo_tail_loop, "TailLoop cannot be daggered.")]
     #[case::cfg_two_blocks_dagger(
         1,
@@ -2576,6 +2829,18 @@ mod test {
     ) {
         let (mut h, _) = modifier_test_hugr(t_num, c_num, foo, true);
         assert_matches!(assert_unresolvable_message(&mut h, expected), Ok(()));
+    }
+
+    #[test]
+    fn test_dagger_rejects_mixed_quantum_classical_tuple() {
+        let (mut h, _) = modifier_test_hugr(1, 1, foo_mixed_tuple_ops, true);
+        assert_matches!(
+            assert_unresolvable_message(
+                &mut h,
+                "tuple mixing quantum and classical elements cannot be daggered."
+            ),
+            Ok(())
+        );
     }
 
     #[test]
@@ -2742,7 +3007,7 @@ mod test {
 
         let foo = foo(&mut module, t_num);
 
-        let _main = {
+        let main = {
             let mut func = module.define_function("main", main_sig).unwrap();
             let loaded = func.load_func(&foo, &[]).unwrap();
             let call1 = func
@@ -2796,10 +3061,10 @@ mod test {
         };
 
         let mut h = module.finish_hugr().unwrap();
+        h.set_entrypoint(main.node());
         assert_matches!(h.validate(), Ok(()));
 
-        let entrypoint = h.entrypoint();
-        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        test_resolve(&mut h);
 
         assert_matches!(h.validate(), Ok(()));
     }
@@ -2871,9 +3136,10 @@ mod test {
 
     fn resolve_and_validate_polymorphic_array_input(module: ModuleBuilder<Hugr>) {
         let mut h = module.finish_hugr().unwrap();
+        let main = super::super::dfg_modify::find_module_func_by_name(&h, "main").unwrap();
+        h.set_entrypoint(main);
         assert_matches!(h.validate(), Ok(()));
-        let entrypoint = h.entrypoint();
-        resolve_modifier_with_entrypoints(&mut h, [entrypoint]).unwrap();
+        test_resolve(&mut h);
         assert_matches!(h.validate(), Ok(()));
     }
 
@@ -3093,6 +3359,7 @@ mod test {
     #[case::qubit_array(PolymorphicArrayElement::Qubit)]
     #[case::usize_array(PolymorphicArrayElement::Usize)]
     /// Test that an indirect call to a polymorphic function is resolved correctly when the function is inside a modified block.
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_control_polymorphic_array_input_nested_dfg_call(
         #[case] element: PolymorphicArrayElement,
     ) {
@@ -3103,6 +3370,7 @@ mod test {
 
     #[rstest::rstest]
     #[case::qubit_array(PolymorphicArrayElement::Qubit)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case::usize_array(PolymorphicArrayElement::Usize)]
     /// Test that a direct call to a polymorphic function is resolved correctly when the function is inside a modified block.
     fn test_control_polymorphic_array_input_nested_dfg_direct_call(
@@ -3117,6 +3385,7 @@ mod test {
     #[case::qubit_array(PolymorphicArrayElement::Qubit)]
     #[case::usize_array(PolymorphicArrayElement::Usize)]
     /// Test that two nested generic functions are resolved correctly when the functions are inside a modified block.
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_control_polymorphic_array_input_two_nested_generic_functions(
         #[case] element: PolymorphicArrayElement,
     ) {

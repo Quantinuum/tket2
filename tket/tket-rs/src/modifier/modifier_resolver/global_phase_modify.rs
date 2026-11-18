@@ -1,12 +1,10 @@
 //! Modifier resolution for global phase operations.
-//! After resolving modifiers, all global phase operations are removed.
-//!
 use hugr::{
     IncomingPort, Node, Wire,
     builder::Dataflow,
     core::HugrNode,
-    extension::simple_op::MakeExtensionOp,
     hugr::hugrmut::HugrMut,
+    ops::{OpType, handle::NodeHandle},
     std_extensions::arithmetic::{float_ops::FloatOps, float_types::ConstF64},
 };
 
@@ -19,17 +17,29 @@ use crate::{
 impl<N: HugrNode> ModifierResolver<N> {
     /// Modify a global phase operation.
     /// This returns the incoming port for the rotation of the modified operation.
+    ///
+    /// `n` is the original node being modified. It may be another op (e.g. a T gate) that
+    /// decomposes into a global phase. Set `map_order_ports` only when `n` is itself a
+    /// `GlobalPhase`: its state order ports are then mapped to those of every `GlobalPhase`
+    /// emitted (there may be several).
+    ///
+    /// If the global phase results from a different gate decomposition order,
+    /// the edges may not be preserved (see https://github.com/Quantinuum/tket2/issues/1947).
     pub(crate) fn modify_global_phase(
         &mut self,
         n: N,
+        map_order_ports: bool,
         new_fn: &mut impl Dataflow,
         ancilla: &mut Vec<Wire<Node>>,
     ) -> Result<Vec<(Node, IncomingPort)>, ModifierResolverErrors<N>> {
+        let phase_op = OpType::from(GlobalPhase);
         match (self.modifiers.dagger, self.control_num()) {
             (false, 0) => {
                 let node = new_fn.add_child_node(GlobalPhase);
-                let in_port = IncomingPort::from(0);
-                Ok(vec![(node, in_port)])
+                if map_order_ports {
+                    self.wire_state_order(n, &phase_op, node, &phase_op)?;
+                }
+                Ok(vec![(node, IncomingPort::from(0))])
             }
             (true, 0) => {
                 let halfturn = new_fn.add_child_node(RotationOp::to_halfturns);
@@ -40,7 +50,10 @@ impl<N: HugrNode> ModifierResolver<N> {
                 let angle = new_fn
                     .add_dataflow_op(RotationOp::from_halfturns_unchecked, vec![neg_angle_float])
                     .map(|out| out.out_wire(0))?;
-                new_fn.add_dataflow_op(GlobalPhase, vec![angle])?;
+                let phase = new_fn.add_dataflow_op(GlobalPhase, vec![angle])?.node();
+                if map_order_ports {
+                    self.wire_state_order(n, &phase_op, phase, &phase_op)?;
+                }
                 Ok(vec![(halfturn, IncomingPort::from(0))])
             }
             // Cn+1Phase(cs, c, θ) = * CnPhase(cs, θ/2) * CnRz(cs, c, θ)
@@ -62,7 +75,7 @@ impl<N: HugrNode> ModifierResolver<N> {
 
                 // C^nPhase(cs, θ/2)
                 let c_phase = self.with_ancilla(&mut c, ancilla, |this, ancilla| {
-                    this.modify_global_phase(n, new_fn, ancilla)
+                    this.modify_global_phase(n, map_order_ports, new_fn, ancilla)
                 })?;
                 for (node, port) in c_phase {
                     new_fn
@@ -102,39 +115,30 @@ impl<N: HugrNode> ModifierResolver<N> {
     }
 }
 
-/// Delete all global phase operations in the subgraph reachable from the given entry points.
-pub(crate) fn delete_phase<N: HugrNode>(
-    h: &mut impl HugrMut<Node = N>,
-    entry_points: impl IntoIterator<Item = N>,
-) -> Result<(), ModifierResolverErrors<N>> {
-    for entry_point in entry_points {
-        let descendants = h.descendants(entry_point).collect::<Vec<_>>();
-        for node in descendants {
-            if GlobalPhase::from_optype(h.get_optype(node)).is_some() {
-                h.remove_subtree(node);
-            }
-        }
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use std::iter;
 
-    use hugr::Hugr;
-    use hugr::ops::handle::FuncID;
     use hugr::{
-        builder::{DataflowSubContainer, ModuleBuilder},
-        extension::prelude::qb_t,
+        Hugr, HugrView,
+        builder::{DataflowHugr, DataflowSubContainer, FunctionBuilder, ModuleBuilder},
+        extension::{prelude::qb_t, simple_op::MakeExtensionOp},
+        ops::handle::{FuncID, NodeHandle},
+        type_row,
         types::Signature,
     };
 
-    use crate::extension::rotation::ConstRotation;
-    use crate::modifier::modifier_resolver::tests::SetUnitary;
-    use crate::modifier::modifier_resolver::tests::test_modifier_resolver;
+    use crate::{
+        extension::rotation::ConstRotation,
+        modifier::modifier_resolver::{
+            resolve_modifier,
+            tests::{SetUnitary, resolved_modifier_test_hugr},
+        },
+        passes::{PassScope, force_order::force_order},
+    };
 
     use super::*;
+    use crate::modifier::modifier_resolver::tests::{modifier_test_hugr, test_resolve};
 
     fn foo(module: &mut ModuleBuilder<Hugr>, t_num: usize) -> FuncID<true> {
         let foo_sig = Signature::new_endo(iter::repeat_n(qb_t(), t_num).collect::<Vec<_>>());
@@ -146,7 +150,28 @@ mod tests {
         *func.finish_with_outputs(inputs).unwrap().handle()
     }
 
+    /// Verify that global phases survive modifier resolution when no modifiers are applied.
+    #[test]
+    fn global_phase_without_modifiers_is_preserved() {
+        let mut function = FunctionBuilder::new("main", Signature::new_endo(type_row![])).unwrap();
+        let angle = function.add_load_value(ConstRotation::new(0.5).unwrap());
+        let phase = function
+            .add_dataflow_op(GlobalPhase, [angle])
+            .unwrap()
+            .node();
+        let mut h = function.finish_hugr_with_outputs([]).unwrap();
+
+        resolve_modifier(&mut h, &PassScope::default()).unwrap();
+
+        assert!(h.contains_node(phase));
+        assert_eq!(
+            h.single_linked_output(phase, IncomingPort::from(0)),
+            Some((angle.node(), angle.source())),
+        );
+    }
+
     #[rstest::rstest]
+    #[case(0, foo, true)]
     #[case(1, foo, false)]
     #[case(1, foo, true)]
     #[case(5, foo, false)]
@@ -156,6 +181,69 @@ mod tests {
         #[case] foo: fn(&mut ModuleBuilder<Hugr>, usize) -> FuncID<true>,
         #[case] dagger: bool,
     ) {
-        test_modifier_resolver(0, c_num, foo, dagger);
+        let h = resolved_modifier_test_hugr(0, c_num, foo, dagger);
+        assert!(
+            h.nodes()
+                .any(|node| GlobalPhase::from_optype(h.get_optype(node)).is_some()),
+            "modifier resolution discarded the global phase",
+        );
+    }
+
+    /// Global phases with order edges must keep them, including when the phase
+    /// is split into several operations by control/dagger modifiers.
+    #[rstest::rstest]
+    #[case(0, false)]
+    #[case(0, true)]
+    #[case(1, false)]
+    #[case(1, true)]
+    #[case(3, false)]
+    #[case(3, true)]
+    fn test_global_phase_with_order_edges(#[case] c_num: u64, #[case] dagger: bool) {
+        fn foo_ordered(module: &mut ModuleBuilder<Hugr>, _: usize) -> FuncID<true> {
+            let mut func = module
+                .define_function("foo", Signature::new_endo([qb_t()]))
+                .unwrap();
+            func.set_unitary();
+            let [q] = func.input_wires_arr();
+            let theta = func.add_load_value(ConstRotation::new(0.5).unwrap());
+            let q = func.add_dataflow_op(TketOp::X, [q]).unwrap().out_wire(0);
+            func.add_dataflow_op(GlobalPhase, vec![theta]).unwrap();
+            let q = func.add_dataflow_op(TketOp::X, [q]).unwrap().out_wire(0);
+            *func.finish_with_outputs([q]).unwrap().handle()
+        }
+
+        let (mut h, foo_node) = modifier_test_hugr(1, c_num, foo_ordered, dagger);
+        // The `GlobalPhase` has no qubit wires, so nothing orders it relative to the X gates.
+        // `force_order` chains the children of `foo` with StateOrder edges, ranked by node
+        // index (i.e. creation order: load, X, phase, X). The phase therefore gets an order edge
+        // on both its input and output, which the resolver must carry over.
+        force_order(&mut h, foo_node, |_, n| hugr::NodeIndex::index(n) as i64).unwrap();
+        let phase = h
+            .descendants(foo_node)
+            .find(|n| GlobalPhase::from_optype(h.get_optype(*n)).is_some())
+            .unwrap();
+        let order_in = h.get_optype(phase).other_input_port().unwrap();
+        let order_out = h.get_optype(phase).other_output_port().unwrap();
+        assert!(h.single_linked_output(phase, order_in).is_some());
+        assert!(h.linked_inputs(phase, order_out).next().is_some());
+        h.validate().unwrap();
+
+        // After resolving, we should not have any missing correspondence errors.
+        test_resolve(&mut h);
+        let phases: Vec<_> = h
+            .nodes()
+            .filter(|node| GlobalPhase::from_optype(h.get_optype(*node)).is_some())
+            .collect();
+        assert!(!phases.is_empty());
+
+        // Order edges are dropped under dagger. Otherwise they must still reach the phase.
+        // Phases produced as a by-product of decomposing other gates (e.g. the controlled Rz)
+        // carry no order edges, so we only require that some phase keeps them.
+        if !dagger {
+            assert!(phases.iter().any(|&phase| {
+                h.single_linked_output(phase, order_in).is_some()
+                    && h.linked_inputs(phase, order_out).next().is_some()
+            }));
+        }
     }
 }

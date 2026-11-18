@@ -143,7 +143,7 @@ impl<const N: usize> CircuitCost for LexicographicCost<usize, N> {
     fn div_cost(&self, n: NonZeroUsize) -> Self {
         let mut ret = [0; N];
         for (div, &a) in ret.iter_mut().zip(&self.0) {
-            *div = (a.saturating_sub(1)) / n.get() + 1;
+            *div = (a.saturating_sub(1)) / n + 1;
         }
         Self(ret)
     }
@@ -176,7 +176,7 @@ impl CircuitCost for usize {
 
     #[inline]
     fn div_cost(&self, n: NonZeroUsize) -> Self {
-        (self.saturating_sub(1)) / n.get() + 1
+        (self.saturating_sub(1)) / n + 1
     }
 }
 

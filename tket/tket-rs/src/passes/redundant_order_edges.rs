@@ -178,6 +178,7 @@ mod tests {
            [("input", "noop1"), ("noop1", "noop5"), ("input", "noop4"), ("noop4", "noop5"), ("noop5", "output")])]
     #[case([("noop1", "noop4"), ("noop4", "noop2"), ("noop2", "noop5"), ("noop4", "noop5"), ("noop1", "noop5")],
            [("noop1", "noop4"), ("noop4", "noop2"), ("noop2", "noop5"), ("noop1", "noop4")])]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_redundant_order_edges(
         #[case] start_edges: impl IntoIterator<Item = (&'static str, &'static str)>,
         #[case] end_edges: impl IntoIterator<Item = (&'static str, &'static str)>,
