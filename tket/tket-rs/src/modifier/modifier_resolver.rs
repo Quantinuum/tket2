@@ -1,25 +1,31 @@
 //! Resolve modifier chains by applying their combined modifiers to function bodies.
 //!
-//! The entry point of this module is [`resolve_modifier`], which takes a hugr
+//! The entry point of this module is [`resolve_modifier`], which takes a HUGR
 //! and a pass scope. The resolver visits all nodes reachable from the scope's root.
+//! To trace modifier chains, rebuild function bodies, and reconnect wires,
+//! [`ModifierResolver`] keeps track of each rewrite using the following fields:
+//! - `modifiers` stores control-array sizes, dagger parity, and exponent ports
+//!   from the current chain. `controls` tracks the qubit wires between operations.
+//! - `call_map` records static edges to reconnect calls and loaders to their
+//!   definitions after inserting a rebuilt body.
+//! - `modified_impls` caches definitions by original function and `ModifierCacheKey`.
+//!   Reserving a definition before building its body lets recursive calls reuse it.
+//!   `custom_adapters` caches wrappers that reorder control arguments.
+//! - `new_callees` lists bodies to visit. `modified_functions` tracks original
+//!   definitions for cleanup.
 //!
-//! The main struct [`ModifierResolver`] holds the state during the process,
-//! and implements the core logic. `corresp_map` holds
-//! the main information during the process, which is a map from wires
-//! in the graph being modified to wires in the new graph being constructed.
+//! ## Tracing a modifier chain
 //!
-//! A modifier is assumed to be applied to a loaded function
-//! and called directly exactly once by another modifier or
-//! an `IndirectCall` node.
-//! That is, the following structure is assumed:
+//! Each modifier in a chain has a single consumer, either another modifier or
+//! the final `CallIndirect` node.
 //! ```text
-//! LoadFunction -> Modifier* -> IndirectedCall
+//! LoadFunction -> Modifier* -> CallIndirect
 //! ```
 //! Any other structure is not supported at this point, such as:
 //! ```text
-//! LoadFunction -> Modifier -> IndirectedCall
+//! LoadFunction -> Modifier -> CallIndirect
 //!                 |
-//!                 +-> Modifier -> IndirectedCall.
+//!                 +-> Modifier -> CallIndirect.
 //! ```
 //! The resolver starts at a `CallIndirect` fed by a modifier chain and traces
 //! backwards to its `LoadFunction`, accumulating the modifiers. It rebuilds
@@ -30,29 +36,18 @@
 //! scope allows removing them. Nodes whose interface must be preserved by the
 //! scope are kept.
 //!
-//! While resolving modifiers, we hold the original hugr `h` and the node to be modified `n`,
-//! and a builder `new_dfg` to construct the new graph.
-//! The correspondence map (`corresp_map`) keeps the correspondence
-//! from wires in `h` to wires in `new_dfg`.
-//! The `call_map` keeps track of the calls to the modified function, so that we can connect
-//! the modified function to its callers after the resolution.
-//! See `modify_op`, which is the main function that modifies each node.
+//! ## Rebuilding a function body
 //!
-//! During the resolution, when a node with some data flow included (such as a function) is encountered,
-//! the function `modify_dfg_body`is called.
-//! This function modifies the I/O nodes and then calls
-//! `modify_dfg_children`
-//! to visit all other children nodes.
-//! When dagger is applied, the order of nodes to be processed is reversed,
-//! since the control qubits are passed in the reverse order.
-//! After visiting all children, `modify_dfg_body` calls
-//! ModifierResolver::connect_all to connect all wires that are registered
-//! in the correspondence map.
+//! Each body gets its own `corresp_map`, which maps each original node and port
+//! (`DirWire`) to zero or more replacement endpoints. After rewriting the inputs
+//! and outputs, `modify_dfg_body` visits nodes from `worklist` in topological
+//! order (reversed for dagger). Once `modify_op` has recorded the mappings for
+//! all nodes, `connect_all` reconnects the mapped endpoints in the new body.
+//!
+//! ### Dagger and wire direction
 //!
 //! Applying dagger reverses both the order of operations and the direction of
-//! wires carrying quantum data.
-//! Let us explain this with an example.
-//! Suppose we have a graph like below:
+//! wires carrying quantum data. Consider an `Rx` rotation followed by an `S` gate.
 //! ```text
 //! In(0) -------> [Rx] -------> [S] -------> Out(0)
 //!                 ^
@@ -80,26 +75,36 @@
 //! (angle(π), Out(0))  -> (angle(π), Out(0))
 //! (Rx, In(1))         -> (fneg, In(0))
 //! ```
-//! From this correspondence map, we can see that the direction of wires in the new graph
-//! can be completely mixed up.
-//! The logic of registering such correspondence is implemented in a function such as
-//! `wire_node_inout`.
-//! Also, the correspondence of I/O wires should be changed accordingly, depending on whether a type
-//! has qubits or not (as defined by [TypeUnpacker])
-//! We also should not forget to connect `fneg` to `Rx` in the new graph, whose edge/wires has
-//! no correspondence in the original graph.
+//! `wire_node_inout` uses `qubit_finder`, a [`TypeUnpacker`], to identify
+//! ports whose types contain qubits. Under dagger those ports change direction,
+//! while the angle still flows forward. The entry for `(Rx, In(1))` lets
+//! `connect_all` route the angle to `fneg`. The gate rewrite connects the
+//! new `fneg` output to `Rx` directly.
+//!
+//! ### Power resolution
+//!
 //!
 //! Each power modifier adds an unsigned 64-bit exponent input to the replacement call.
-//! The resolver multiplies exponents in the same chain to obtain the runtime
-//! repetition count. A zero count returns the leading INOUT inputs unchanged.
+//! Exponents on the same modifier chain are multiplied. For example,
+//! `LoadFunction(f) -> Power(a) -> Power(b) -> CallIndirect` denotes
+//! `a * b` applications of `f`.
+//! A zero exponent returns the leading INOUT inputs unchanged.
 //! For a positive count, a `TailLoop` runs the body that many times, feeding INOUT
 //! outputs into the next iteration and reusing trailing input-only parameters.
+//! When Power is combined with other modifiers, Control and Dagger modify the repeated body,
+//! while nested modifier chains resolve their powers independently.Generated loops carry
+//! `tket.power_loop` metadata so later rewrites preserve the forward counter and classical
+//! loop-carried values.
 //!
-//! Control and dagger modify the repeated body; nested modifier chains resolve
-//! their powers independently. Generated loops carry `tket.power_loop` metadata
-//! so later rewrites preserve the forward counter and classical loop-carried values.
+//! #### Exponent overflow in the current resolver
+//!
+//! The resolver currently combines exponents with HUGR's [64-bit `imul`], which
+//! wraps modulo `2^64`. Two exponents of `2^32` on one chain produce a loop
+//! count of zero. A three-qubit cycle should rotate once in this case because
+//! `2^64 mod 3 = 1`.
 //!
 //! ## Not supported:
+//!
 //! - Dagger of non-trivial CFGs: We cannot support dagger for complicated CFGs
 //!   since it is not clear at all whether we should reverse the control flow or not.
 //!   Currently, when any non-trivial cfg with more than one block is encountered during
@@ -150,7 +155,7 @@ impl Metadata for IsPowerLoop {
     type Type<'hugr> = bool;
 }
 
-/// A wire of either direction.
+/// A wire endpoint identified by a node and a port, including its direction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct DirWire<N = Node>(N, Port);
 
@@ -276,8 +281,9 @@ impl<N> PortExt for DirWire<N> {
     }
 }
 
-/// A vector of ports for each node.
-/// The `if_rev` vector is used to swap the wires if the dagger is applied.
+/// Replacement endpoints in the order of the original node's input and output ports.
+/// Under dagger, an entry in `incoming` can be an output of the replacement,
+/// and an entry in `outgoing` can be an input.
 pub struct PortVector<N = Node> {
     incoming: Vec<DirWire<N>>,
     outgoing: Vec<DirWire<N>>,
@@ -321,17 +327,16 @@ impl<N: HugrNode> PortVector<N> {
     }
 }
 
-/// A container for modifier resolving.
-/// This struct holds the state during the modifier resolution process.
+/// Traces modifier chains and builds their replacement function definitions.
+/// Each body has its own wire correspondence map. Generated definitions can
+/// be reused across bodies and call sites.
 pub struct ModifierResolver<N: HugrNode = Node> {
     /// Current accumulated modifiers.
     modifiers: CombinedModifier<N>,
-    /// A map from old wire to new wires.
-    /// The keys are old wires, and the values are new wires.
-    /// As noted at the head of this module, especially when dagger is applied,
-    /// an incoming wire may correspond to an outgoing wire and vice versa.
+    /// Maps original endpoints in the current body to zero or more replacement
+    /// endpoints. Under dagger, a quantum input can map to an output and vice versa.
     corresp_map: HashMap<DirWire<N>, Vec<DirWire>>,
-    /// The current control outgoing wires
+    /// Latest output wire for each control qubit in the body being built.
     controls: Vec<Wire>,
     /// The worklist of nodes to be processed.
     /// This is needed to avoid modifying a node that is generated during the process.
