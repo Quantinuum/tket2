@@ -6,6 +6,7 @@ use crate::hugr::llvm::custom::CodegenExtsMap;
 use crate::hugr::llvm::extension::int::IntCodegenExtension;
 use anyhow::{Context as _, Result};
 use tket::hugr::Hugr;
+use tket::llvm::global_phase::GlobalPhaseCodegenExtension;
 use tket::llvm::rotation::RotationCodegenExtension;
 use tket_qsystem::QSystemPlatform;
 use tket_qsystem::extension::REGISTRY;
@@ -65,6 +66,7 @@ pub(crate) fn codegen_extensions(platform: QSystemPlatform) -> CodegenExtsMap<'s
             SeleneHeapArrayCodegen::LOWERING,
         ))
         .add_extension(RotationCodegenExtension::new(prelude))
+        .add_extension(GlobalPhaseCodegenExtension)
         .add_extension(UtilsCodegenExtension)
         // State results use standard arrays.
         .add_extension(DebugCodegenExtension::new(SeleneHeapArrayCodegen::LOWERING))
