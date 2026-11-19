@@ -16,6 +16,20 @@ pub use crate::modifier::modifier_resolver::ModifierResolverErrors;
 /// Solved original function nodes may be removed after resolution when they
 /// are no longer needed and [`PassScope::in_scope`] allows them to be modified
 /// freely. Nodes whose interface is preserved by the scope are kept.
+///
+/// # Metadata
+///
+/// Verbatim copies of operations and subgraphs keep all their metadata.
+/// A rebuilt function definition, rewritten call or replacement function
+/// loader inherits `core.debug_info` from its counterpart. This keeps custom
+/// modifier registrations and signature-dependent hints local to their original
+/// definitions. An extension operation's source location follows each extension
+/// operation in its decomposition.
+///
+/// Rebuilt containers inside function bodies, I/O nodes, and synthetic adapters
+/// and control-array operations start without annotations. Metadata on an
+/// eliminated modifier disappears with it. Reused custom implementations keep
+/// their own annotations.
 #[derive(Default)]
 pub struct ModifierResolverPass {
     /// Where to apply the pass.

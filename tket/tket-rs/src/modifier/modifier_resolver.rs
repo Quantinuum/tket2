@@ -104,6 +104,7 @@
 //!   that operate on quantum data. We currently raise an error if one is found.
 use fxhash::FxHashSet;
 use hugr::builder::BuildError;
+use hugr_core::{hugr::internal::HugrMutInternals, metadata::DEBUGINFO_META_KEY};
 use itertools::{Either, Itertools};
 use std::{
     collections::{BTreeSet, HashMap, HashSet, VecDeque},
@@ -129,7 +130,7 @@ use hugr::{
         simple_op::MakeExtensionOp,
     },
     hugr::hugrmut::HugrMut,
-    ops::{CFG, Const, OpTrait, OpType},
+    ops::{CFG, OpTrait, OpType},
     std_extensions::collections::array::array_type,
     types::{EdgeKind, FuncTypeBase, Signature, Type},
 };
@@ -574,12 +575,18 @@ impl<N: HugrNode> ModifierResolver<N> {
     /// This function adds a node to the builder that is not affected by the modifiers.
     fn add_node_no_modification(
         &mut self,
-        h: &impl HugrMut<Node = N>,
+        h: &impl HugrView<Node = N>,
         old_n: N,
-        op: impl Into<OpType>,
         new_dfg: &mut impl Container,
     ) -> Result<Node, ModifierResolverErrors<N>> {
-        let node = new_dfg.add_child_node(op);
+        let node = new_dfg.add_child_node(h.get_optype(old_n).clone());
+        let metadata = h.node_metadata_map(old_n);
+        if !metadata.is_empty() {
+            new_dfg
+                .hugr_mut()
+                .node_metadata_map_mut(node)
+                .clone_from(metadata);
+        }
         for port in h.all_node_ports(old_n) {
             self.map_insert(DirWire(old_n, port), DirWire(node, port))?;
         }
@@ -704,6 +711,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         )?;
         // Insert the new loader and connect it to the modified function.
         let new_load_node = hugr.add_node_before(indirect_call_node, new_load_op);
+        copy_debug_info_within(hugr, load_node, new_load_node);
         hugr.connect(modified_fn, 0, new_load_node, 0);
         // Transfer order dependencies before removing the original loader.
         let old_op = hugr.get_optype(load_node);
@@ -809,13 +817,8 @@ impl<N: HugrNode> ModifierResolver<N> {
             OpType::ExtensionOp(_) => {
                 self.modify_extension_op(h, target_node, optype, new_dfg)?;
             }
-            // Constants
-            OpType::Const(constant) => {
-                self.modify_constant(target_node, constant, new_dfg)?;
-            }
-            // Load constant
-            OpType::LoadConstant(_) | OpType::OpaqueOp(_) | OpType::Tag(_) => {
-                self.add_node_no_modification(h, target_node, optype.clone(), new_dfg)?;
+            OpType::Const(_) | OpType::LoadConstant(_) | OpType::OpaqueOp(_) | OpType::Tag(_) => {
+                self.add_node_no_modification(h, target_node, new_dfg)?;
             }
 
             // Invalid nodes
@@ -1048,35 +1051,42 @@ impl<N: HugrNode> ModifierResolver<N> {
         Ok(())
     }
 
-    fn modify_constant(
-        &mut self,
-        n: N,
-        constant: &Const,
-        new_dfg: &mut impl Container,
-    ) -> Result<(), ModifierResolverErrors<N>> {
-        let output = new_dfg.add_child_node(constant.clone());
-        self.map_insert(Wire::new(n, 0).into(), Wire::new(output, 0).into())
-    }
-
-    /// Copy the dataflow operation to the new function.
-    /// These are the operations that are not modified by the modifier.
-    fn modify_dataflow_op(
+    /// Propagate the source location to the extension ops emitted by this rewrite.
+    fn modify_extension_op(
         &mut self,
         h: &impl HugrMut<Node = N>,
-        n: N,
+        op_node: N,
         optype: &OpType,
-        new_dfg: &mut impl Container,
+        new_dfg: &mut impl Dataflow,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        let new_node = new_dfg.add_child_node(optype.clone());
-        let signature = h.signature(n).unwrap();
-        let inputs = signature.input.iter();
-        let outputs = signature.output.iter();
-        self.wire_node_inout(n, new_node, (inputs, outputs), (0, 0, 0))?;
-        self.wire_state_order(n, optype, new_node, optype)?;
+        let Some(location) = h.get_metadata_any(op_node, DEBUGINFO_META_KEY) else {
+            return self.rewrite_extension_op(h, op_node, optype, new_dfg);
+        };
+
+        // Builders append children. Walk back to this boundary to visit only the
+        // current decomposition, including intermediate gates absent from the port map.
+        let parent = new_dfg.container_node();
+        let previous_last = new_dfg.hugr().children(parent).next_back();
+        self.rewrite_extension_op(h, op_node, optype, new_dfg)?;
+        let graph = new_dfg.hugr();
+        let emitted = graph
+            .children(parent)
+            .rev()
+            .take_while(|&n| Some(n) != previous_last)
+            .filter(|&n| {
+                graph.get_optype(n).is_extension_op()
+                    && graph.get_metadata_any(n, DEBUGINFO_META_KEY).is_none()
+            })
+            .collect_vec();
+        for node in emitted {
+            new_dfg
+                .hugr_mut()
+                .set_metadata_any(node, DEBUGINFO_META_KEY, location.clone());
+        }
         Ok(())
     }
 
-    fn modify_extension_op(
+    fn rewrite_extension_op(
         &mut self,
         h: &impl HugrMut<Node = N>,
         op_node: N,
@@ -1090,7 +1100,14 @@ impl<N: HugrNode> ModifierResolver<N> {
             ));
         }
 
-        if let Some(tket_op) = TketOp::from_optype(optype) {
+        let tket_op = TketOp::from_optype(optype);
+        let global_phase = GlobalPhase::from_optype(optype).is_some();
+        if (tket_op.is_some() || global_phase) && self.control_num() == 0 && !self.modifiers.dagger
+        {
+            self.add_node_no_modification(h, op_node, new_dfg)?;
+            return Ok(());
+        }
+        if let Some(tket_op) = tket_op {
             let is_state_order_target = optype.other_input_port().is_some_and(|port| {
                 optype.port_kind(port) == Some(EdgeKind::StateOrder)
                     && h.single_linked_output(op_node, port).is_some()
@@ -1099,7 +1116,7 @@ impl<N: HugrNode> ModifierResolver<N> {
                 let pv = this.modify_tket_op(op_node, tket_op, new_dfg, &mut vec![])?;
                 this.add_edge_from_pv(h, op_node, pv)
             })
-        } else if GlobalPhase::from_optype(optype).is_some() {
+        } else if global_phase {
             let inputs = self.modify_global_phase(op_node, true, new_dfg, &mut vec![])?;
             self.corresp_map().insert(
                 (op_node, IncomingPort::from(0)).into(),
@@ -1114,7 +1131,8 @@ impl<N: HugrNode> ModifierResolver<N> {
         {
             Ok(())
         } else if !self.signature_has_quantum_data(&signature) {
-            self.modify_dataflow_op(h, op_node, optype, new_dfg)
+            self.add_node_no_modification(h, op_node, new_dfg)?;
+            Ok(())
         } else {
             // Some other Hugr extension operation.
             // Here, we do not know what is the modified version.
@@ -1148,13 +1166,13 @@ impl<N: HugrNode> ModifierResolver<N> {
             .filter(|ty| self.qubit_finder.contains_element_type(ty))
             .count();
         if num_quantum == 0 {
-            // Take existing classical path instead (`modify_dataflow_op`).
+            // Let the caller copy the classical operation.
             return Ok(false);
         }
 
         if !self.modifiers.dagger {
             // Without dagger, just add the node without modification.
-            self.add_node_no_modification(h, n, optype.clone(), new_dfg)?;
+            self.add_node_no_modification(h, n, new_dfg)?;
             return Ok(true);
         }
 
@@ -1299,6 +1317,13 @@ impl<N: HugrNode> ModifierResolver<N> {
         }
 
         Ok(())
+    }
+}
+
+/// Copy source provenance when replacing a node in the same HUGR.
+fn copy_debug_info_within<H: HugrMut>(h: &mut H, source: H::Node, replacement: H::Node) {
+    if let Some(record) = h.get_metadata_any(source, DEBUGINFO_META_KEY).cloned() {
+        h.set_metadata_any(replacement, DEBUGINFO_META_KEY, record);
     }
 }
 
@@ -1767,6 +1792,89 @@ mod tests {
         h.set_entrypoint(main.node());
         assert_matches!(h.validate(), Ok(()));
         (h, foo_node)
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
+    fn metadata_follows_operations_in_a_controlled_body() {
+        use crate::extension::rotation::ConstRotation;
+        use serde_json::json;
+
+        let rotation_location = json!({"kind": "location", "line_no": 10, "column": 3});
+        let x_location = json!({"kind": "location", "line_no": 11, "column": 3});
+        let subprogram = json!({"kind": "subprogram", "file": 0, "line_no": 9, "scope_line": 10});
+        let tag = json!(["angle", 42]);
+        let h = resolved_modifier_test_hugr(
+            1,
+            1,
+            |module, _| {
+                let mut f = module
+                    .define_function("rotate", Signature::new_endo([qb_t()]))
+                    .unwrap();
+                let func = f.container_node();
+                f.hugr_mut()
+                    .set_metadata_any(func, DEBUGINFO_META_KEY, subprogram.clone());
+                f.hugr_mut()
+                    .set_metadata::<metadata::DaggeredImplementation>(func, "custom_dagger".into());
+                let [q] = f.input_wires_arr();
+                let angle = f.add_load_value(ConstRotation::new(0.25).unwrap());
+                f.hugr_mut()
+                    .set_metadata_any(angle.node(), "test.tag", tag.clone());
+                let rx = f.add_dataflow_op(TketOp::Rx, [q, angle]).unwrap();
+                f.hugr_mut().set_metadata_any(
+                    rx.node(),
+                    DEBUGINFO_META_KEY,
+                    rotation_location.clone(),
+                );
+                f.hugr_mut()
+                    .set_metadata_any(rx.node(), "test.tag", json!("rotation only"));
+                let x = f.add_dataflow_op(TketOp::X, rx.outputs()).unwrap();
+                f.hugr_mut()
+                    .set_metadata_any(x.node(), DEBUGINFO_META_KEY, x_location.clone());
+                *f.finish_with_outputs(x.outputs()).unwrap().handle()
+            },
+            false,
+        );
+
+        let func = dfg_modify::find_module_func_by_name(&h, "__modified__rotate[C1]").unwrap();
+        assert_eq!(
+            h.get_metadata_any(func, DEBUGINFO_META_KEY),
+            Some(&subprogram)
+        );
+        assert!(
+            h.get_metadata::<metadata::DaggeredImplementation>(func)
+                .is_none()
+        );
+        let mut h_count = 0;
+        let mut crz_count = 0;
+        let mut cx_count = 0;
+        let mut tagged_loads = 0;
+        for node in h.children(func) {
+            let op = h.get_optype(node);
+            let expected = match TketOp::from_optype(op) {
+                Some(TketOp::H) => {
+                    h_count += 1;
+                    Some(&rotation_location)
+                }
+                Some(TketOp::CRz) => {
+                    crz_count += 1;
+                    Some(&rotation_location)
+                }
+                Some(TketOp::CX) => {
+                    cx_count += 1;
+                    Some(&x_location)
+                }
+                _ => None,
+            };
+            assert_eq!(h.get_metadata_any(node, DEBUGINFO_META_KEY), expected);
+            if op.is_load_constant() {
+                tagged_loads += 1;
+                assert_eq!(h.get_metadata_any(node, "test.tag"), Some(&tag));
+            } else {
+                assert!(h.get_metadata_any(node, "test.tag").is_none());
+            }
+        }
+        assert_eq!((h_count, crz_count, cx_count, tagged_loads), (2, 1, 1, 1));
     }
 
     #[test]
