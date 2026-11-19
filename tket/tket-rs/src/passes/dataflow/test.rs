@@ -785,3 +785,27 @@ fn func_override_input_top(#[values(false, true)] pre_pop_wire: bool) {
     // `true` value from main should be overridden by the `Top` we fed in:
     assert_eq!(results.read_out_wire(callee_inp), Some(PartialValue::Top));
 }
+
+#[rstest]
+#[case(false)]
+#[case(true)]
+fn external_function_results_are_unknown(#[case] indirect: bool) {
+    let signature = Signature::new(vec![], vec![bool_t()]);
+    let mut builder = DFGBuilder::new(signature.clone()).unwrap();
+    let declaration = builder
+        .module_root_builder()
+        .declare("external", signature.clone().into())
+        .unwrap();
+    let call = if indirect {
+        let function = builder.load_func(&declaration, &[]).unwrap();
+        builder
+            .add_dataflow_op(CallIndirect { signature }, [function])
+            .unwrap()
+    } else {
+        builder.call(&declaration, &[], []).unwrap()
+    };
+    let [output] = call.outputs_arr();
+    let hugr = builder.finish_hugr_with_outputs([output]).unwrap();
+    let results = Machine::new(&hugr).run_subtree(TestContext, hugr.entrypoint());
+    assert_eq!(results.read_out_wire(output), Some(PartialValue::Top));
+}

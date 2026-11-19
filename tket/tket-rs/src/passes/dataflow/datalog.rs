@@ -381,6 +381,13 @@ fn run_datalog<V: AbstractValue, H: HugrView>(
             function_return(outp, call),
             in_wire_value(outp, p, v);
 
+        // An external declaration has no Output child to provide return facts.
+        // Its results are unknown (Top), not impossible (the default Bottom).
+        out_wire_value(call, p, PV::Top) <--
+            func_call(call, func),
+            if hugr.get_optype(*func).is_func_decl(),
+            for (p, _) in hugr.out_value_types(*call);
+
         // CallIndirect --------------------
         lattice indirect_call(H::Node, LatticeWrapper<H::Node>); // <Node> is an `IndirectCall` to `FuncDefn` <Node>
         indirect_call(call, tgt) <--
@@ -400,6 +407,12 @@ fn run_datalog<V: AbstractValue, H: HugrView>(
             if let LatticeWrapper::Value(func) = lv,
             output_child(func, outp),
             in_wire_value(outp, p, v);
+
+        out_wire_value(call, p, PV::Top) <--
+            indirect_call(call, lv),
+            if let LatticeWrapper::Value(func) = lv,
+            if hugr.get_optype(*func).is_func_decl(),
+            for (p, _) in hugr.out_value_types(*call);
 
         // Default out-value is Bottom, but if we can't determine the called function,
         // assign everything to Top
