@@ -1,13 +1,12 @@
 [package]
 name = "tket"
-version = "0.22.1"
+version = "0.23.0"
 edition = { workspace = true }
 rust-version = { workspace = true }
 
 license = { workspace = true }
 readme = "README.md"
 documentation = "https://docs.rs/tket"
-homepage = { workspace = true }
 repository = { workspace = true }
 description = "Quantinuum's TKET Quantum Compiler"
 keywords = ["Quantum", "Quantinuum"]
@@ -69,7 +68,6 @@ rmp-serde = { workspace = true, optional = true }
 delegate = { workspace = true }
 csv = { workspace = true }
 chrono = { workspace = true }
-bytemuck = { workspace = true }
 crossbeam-channel = { workspace = true }
 tracing = { workspace = true }
 pest = { workspace = true }

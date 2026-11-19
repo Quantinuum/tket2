@@ -21,8 +21,8 @@ serde_json.workspace = true
 tracing.workspace = true
 itertools.workspace = true
 strum.workspace = true
-tket = { path = "../tket-rs", version = "0.22.1" }
-tket-qsystem = { path = "../tket-qsystem", version = "0.29.1", features = [
+tket = { path = "../tket-rs", version = "0.23.0" }
+tket-qsystem = { path = "../tket-qsystem", version = "0.30.0", features = [
     "llvm",
 ] }
 
@@ -34,10 +34,6 @@ workspace = true
 default = []
 py = ["dep:pyo3"]
 
-[build-dependencies]
-cbindgen.workspace = true
-pyo3-build-config.workspace = true
-
 [dev-dependencies]
 rstest.workspace = true
 serde.workspace = true
@@ -46,6 +42,3 @@ typetag.workspace = true
 # Defined here so it can be overridden by the codspeed CI job
 # using `cargo add`.
 insta = "1.47.2"
-
-[package.metadata.cargo-machete]
-ignored = ["cbindgen", "pyo3-build-config"]

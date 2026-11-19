@@ -25,7 +25,7 @@ use hugr::{
 };
 use petgraph::visit::{Topo, Walker};
 
-use crate::extension::modifier::Modifier;
+use crate::extension::{global_phase::GlobalPhase, modifier::Modifier};
 
 use super::{DirWire, ModifierResolver, ModifierResolverErrors, PortExt};
 
@@ -722,12 +722,15 @@ impl<N: HugrNode> ModifierResolver<N> {
         dfg: &DFG,
         new_parent_dfg: &mut impl Container,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        // Check if the DFG input or output are carrying qubits
+        // Global phases can require modification even with a classical boundary.
         let boundary_has_qubits = self.signature_has_quantum_data(&dfg.signature);
-        if !boundary_has_qubits {
-            // If the DFG does not carry qubits, we still modify its body in case it contains modifier nodes.
-            // Since there are no input/output qubits, modifiers inside the DFG cannot affect the outside of
-            // the DFG, so we can safely resolve them without worrying about the surrounding context.
+        if !boundary_has_qubits
+            && !h
+                .descendants(n)
+                .any(|node| GlobalPhase::from_optype(h.get_optype(node)).is_some())
+        {
+            // Without boundary qubits or global phases, resolve internal modifiers
+            // without propagating the surrounding modifiers into the DFG.
             let new_dfg = self.with_modifiers(Default::default(), |this| {
                 let mut builder = DFGBuilder::new(dfg.signature.clone()).unwrap();
                 this.modify_dfg_body(h, n, &mut builder)?;
@@ -843,12 +846,13 @@ impl<N: HugrNode> ModifierResolver<N> {
         conditional: &Conditional,
         new_dfg: &mut impl Container,
     ) -> Result<(), ModifierResolverErrors<N>> {
-        // A purely classical, modifier-free conditional is unchanged by the
-        // current modifier, so it can be copied without rebuilding its cases.
+        // A conditional without quantum data, modifiers, or global phases is
+        // unchanged by the current modifier, so its cases can be copied.
         let needs_modification = iter::once(n).chain(h.descendants(n)).any(|node| {
             h.signature(node)
                 .is_some_and(|signature| self.signature_has_quantum_data(&signature))
                 || Modifier::from_optype(h.get_optype(node)).is_some()
+                || GlobalPhase::from_optype(h.get_optype(node)).is_some()
         });
         if !needs_modification {
             self.copy_sub_container_no_modification(h, n, new_dfg)?;
@@ -1158,7 +1162,7 @@ mod test {
     use hugr::{
         Hugr,
         builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder, SubContainer},
-        extension::prelude::{ConstUsize, bool_t, qb_t, usize_t},
+        extension::prelude::{ConstUsize, MakeTuple, UnpackTuple, bool_t, qb_t, usize_t},
         extension::simple_op::MakeExtensionOp,
         ops::{
             CallIndirect, ExtensionOp,
@@ -2495,6 +2499,50 @@ mod test {
         *func.finish_with_outputs(inputs).unwrap().handle()
     }
 
+    fn foo_tuple_ops(module: &mut ModuleBuilder<Hugr>, t_num: usize) -> FuncID<true> {
+        assert_eq!(t_num, 2);
+
+        let tuple_types = vec![qb_t(); t_num];
+        let mut func = module
+            .define_function("foo", Signature::new_endo(tuple_types.clone()))
+            .unwrap();
+        func.set_unitary();
+        let inputs: Vec<_> = func.input_wires().collect();
+
+        let tuple = func
+            .add_dataflow_op(MakeTuple::new(tuple_types.clone().into()), inputs)
+            .unwrap()
+            .out_wire(0);
+        let outputs = func
+            .add_dataflow_op(UnpackTuple::new(tuple_types.into()), [tuple])
+            .unwrap()
+            .outputs();
+
+        *func.finish_with_outputs(outputs).unwrap().handle()
+    }
+
+    fn foo_mixed_tuple_ops(module: &mut ModuleBuilder<Hugr>, t_num: usize) -> FuncID<true> {
+        assert_eq!(t_num, 1);
+
+        let tuple_types = vec![qb_t(), usize_t()];
+        let mut func = module
+            .define_function("foo", Signature::new_endo(vec![qb_t()]))
+            .unwrap();
+        func.set_unitary();
+        let qubit = func.input_wires().next().unwrap();
+        let one = func.add_load_value(ConstUsize::new(1));
+
+        let tuple = func
+            .add_dataflow_op(MakeTuple::new(tuple_types.clone().into()), [qubit, one])
+            .unwrap()
+            .out_wire(0);
+        let qubit = func
+            .add_dataflow_op(UnpackTuple::new(tuple_types.into()), [tuple])
+            .unwrap()
+            .out_wire(0);
+
+        *func.finish_with_outputs([qubit]).unwrap().handle()
+    }
     fn foo_non_quantum_array_ops(module: &mut ModuleBuilder<Hugr>, t_num: usize) -> FuncID<true> {
         assert_eq!(t_num, 1);
 
@@ -2607,6 +2655,54 @@ mod test {
         *func.finish_with_outputs([q]).unwrap().handle()
     }
 
+    #[rstest::rstest]
+    #[case::dfg(false)]
+    #[case::conditional(true)]
+    fn control_global_phase_in_classical_container(#[case] conditional: bool) {
+        let h = resolved_modifier_test_hugr(
+            1,
+            1,
+            |module, _| {
+                let mut func = module
+                    .define_function("foo", Signature::new_endo([qb_t()]))
+                    .unwrap();
+                func.set_unitary();
+                let [q] = func.input_wires_arr();
+                let mut dfg = func.dfg_builder(Signature::new_endo([]), []).unwrap();
+                if conditional {
+                    let sum = dfg.make_sum(1, [type_row![], type_row![]], []).unwrap();
+                    let mut cond = dfg
+                        .conditional_builder(([type_row![], type_row![]], sum), [], type_row![])
+                        .unwrap();
+                    cond.case_builder(0)
+                        .unwrap()
+                        .finish_with_outputs([])
+                        .unwrap();
+                    let mut case = cond.case_builder(1).unwrap();
+                    let angle = case.add_load_value(ConstRotation::new(0.5).unwrap());
+                    case.add_dataflow_op(GlobalPhase, [angle]).unwrap();
+                    case.finish_with_outputs([]).unwrap();
+                    cond.finish_sub_container().unwrap();
+                } else {
+                    let angle = dfg.add_load_value(ConstRotation::new(0.5).unwrap());
+                    dfg.add_dataflow_op(GlobalPhase, [angle]).unwrap();
+                }
+                dfg.finish_with_outputs([]).unwrap();
+                *func.finish_with_outputs([q]).unwrap().handle()
+            },
+            false,
+        );
+
+        // The phase must become a rotation on the control, even though its
+        // enclosing containers originally had no quantum inputs or outputs.
+        assert_eq!(
+            h.nodes()
+                .filter(|node| TketOp::from_optype(h.get_optype(*node)) == Some(TketOp::Rz))
+                .count(),
+            1
+        );
+    }
+
     /// Test pass on a DFG with no quantum signature that contains a modifier (dagger)
     /// (https://github.com/Quantinuum/tket2/issues/1814)
     fn foo_dfg_daggered_empty_indirect_call(
@@ -2677,6 +2773,9 @@ mod test {
     #[case::safe_array_ops_dagger(4, 3, foo_safe_array_ops, true)]
     #[case::nested_safe_array_ops(5, 4, foo_nested_quantum_array_ops, false)]
     #[case::nested_safe_array_ops_dagger(5, 4, foo_nested_quantum_array_ops, true)]
+    #[case::tuple_ops(2, 1, foo_tuple_ops, false)]
+    #[case::tuple_ops_dagger(2, 1, foo_tuple_ops, true)]
+    #[case::mixed_tuple_ops(1, 1, foo_mixed_tuple_ops, false)]
 
     fn test_dfg_modify(
         #[case] t_num: usize,
@@ -2730,6 +2829,18 @@ mod test {
     ) {
         let (mut h, _) = modifier_test_hugr(t_num, c_num, foo, true);
         assert_matches!(assert_unresolvable_message(&mut h, expected), Ok(()));
+    }
+
+    #[test]
+    fn test_dagger_rejects_mixed_quantum_classical_tuple() {
+        let (mut h, _) = modifier_test_hugr(1, 1, foo_mixed_tuple_ops, true);
+        assert_matches!(
+            assert_unresolvable_message(
+                &mut h,
+                "tuple mixing quantum and classical elements cannot be daggered."
+            ),
+            Ok(())
+        );
     }
 
     #[test]

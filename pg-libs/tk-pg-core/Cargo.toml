@@ -7,7 +7,6 @@ rust-version = { workspace = true }
 license = { workspace = true }
 readme = "README.md"
 documentation = "https://docs.rs/tk-pg-core"
-homepage = { workspace = true }
 repository = { workspace = true }
 description = "Core types and pass interfaces for Pauli graphs"
 keywords = { workspace = true }

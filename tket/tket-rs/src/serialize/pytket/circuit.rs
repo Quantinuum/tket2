@@ -8,7 +8,7 @@ use hugr::core::{HugrNode, IncomingPort, OutgoingPort};
 use hugr::hugr::hugrmut::HugrMut;
 use hugr::ops::handle::NodeHandle;
 use hugr::ops::{OpParent, OpTag, OpTrait};
-use hugr::types::EdgeKind;
+use hugr::types::{EdgeKind, Type};
 use hugr::{Hugr, HugrView, Node};
 use hugr_core::hugr::internal::HugrMutInternals;
 use indexmap::IndexMap;
@@ -36,6 +36,8 @@ use super::opaque::OpaqueSubgraphs;
 /// circuit that can be used independently, and stored permanently, use
 /// [`EncodedCircuit::new_standalone`] or call
 /// [`EncodedCircuit::ensure_standalone`].
+///
+/// Circuit segments are indexed by [`EncodedCircuitId`].
 #[derive(Debug, Clone)]
 pub struct EncodedCircuit<Node: HugrNode> {
     /// Circuit segments grouped by their originating dataflow region.
@@ -45,7 +47,7 @@ pub struct EncodedCircuit<Node: HugrNode> {
     ///
     /// Regions are ordered as a depth-first pre-order; segments retain their
     /// execution order within each region.
-    circuits: IndexMap<Node, EncodedCircuitInfo>,
+    circuits: IndexMap<Node, EncodedCircuitInfo<Node>>,
     /// Sets of subgraphs in the HUGR that have been encoded as opaque barriers
     /// in the pytket circuit.
     ///
@@ -65,7 +67,7 @@ pub struct EncodedCircuitId<Node> {
 
 /// Information stored about a pytket circuit encoded from a HUGR region.
 #[derive(Debug, Default, Clone)]
-pub(super) struct EncodedCircuitInfo {
+pub(super) struct EncodedCircuitInfo<N> {
     /// Runs of pytket commands encoded from the region.
     pub serial_circuits: Vec<SerialCircuit>,
     /// Opaque subgraphs that must be restored before, between, or after the
@@ -90,9 +92,24 @@ pub(super) struct EncodedCircuitInfo {
     pub output_qubits: Vec<tket_json_rs::register::ElementId>,
     /// List of bit registers seen at the output of the encoded region.
     pub output_bits: Vec<tket_json_rs::register::ElementId>,
+    /// Encoded values with consumers in nested dataflow regions.
+    pub nonlocal_outputs: Vec<NonlocalOutput<N>>,
 }
 
-impl EncodedCircuitInfo {
+/// An encoded value used in nested dataflow regions.
+///
+/// The target ports must be reconnected to the decoded value before replacing
+/// the original region's contents.
+#[derive(Debug, Clone)]
+pub(super) struct NonlocalOutput<N> {
+    pub targets: Vec<(N, IncomingPort)>,
+    pub ty: Type,
+    pub qubits: Vec<tket_json_rs::register::ElementId>,
+    pub bits: Vec<tket_json_rs::register::ElementId>,
+    pub params: Vec<String>,
+}
+
+impl<N> EncodedCircuitInfo<N> {
     /// Initialize a pytket circuit for a decoder
     /// for every segment in this region.
     ///
@@ -293,6 +310,7 @@ impl EncodedCircuit<Node> {
                     .last()
                     .expect("encoded region has a trailing boundary"),
             )?;
+            decoder.reconnect_nonlocal_outputs(&encoded.nonlocal_outputs)?;
             let decoded_node = decoder.finish(Some(encoded))?.node();
 
             // Move any non-local edges from originating from the old input node.
@@ -631,88 +649,57 @@ impl<Node: HugrNode> EncodedCircuit<Node> {
         self.circuits.is_empty()
     }
 
-    /// Returns an iterator over every encoded pytket circuit segment and its region.
+    /// Returns every encoded pytket circuit segment and its identifier.
     ///
-    /// A region containing multiple segments appears once for each segment.
-    // TODO: Update signature to return `(EncodedCircuitId<Node>, &SerialCircuit)` in a breaking release.
-    // See https://github.com/Quantinuum/tket2/issues/1901
-    pub fn iter(&self) -> impl Iterator<Item = (Node, &SerialCircuit)> {
-        self.circuits.iter().flat_map(|(&node, region)| {
-            region
-                .serial_circuits
+    /// Regions retain their encoding order; segments within each region are
+    /// yielded in execution order.
+    pub fn iter(&self) -> impl Iterator<Item = (EncodedCircuitId<Node>, &SerialCircuit)> {
+        self.circuits.iter().flat_map(|(&region, info)| {
+            info.serial_circuits
                 .iter()
-                .map(move |circuit| (node, circuit))
+                .enumerate()
+                .map(move |(segment, circuit)| (EncodedCircuitId { region, segment }, circuit))
         })
     }
 
-    /// Returns a mutable iterator over every circuit segment and its region.
-    ///
-    /// A region containing multiple segments appears once for each segment.
-    // TODO: Update signature to return `(EncodedCircuitId<Node>, &mut SerialCircuit)` in a breaking release.
-    // See https://github.com/Quantinuum/tket2/issues/1901
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = (Node, &mut SerialCircuit)> {
-        self.circuits.iter_mut().flat_map(|(&node, region)| {
-            region
-                .serial_circuits
+    /// Returns mutable circuit segments and their identifiers in encoding order.
+    pub fn iter_mut(
+        &mut self,
+    ) -> impl Iterator<Item = (EncodedCircuitId<Node>, &mut SerialCircuit)> {
+        self.circuits.iter_mut().flat_map(|(&region, info)| {
+            info.serial_circuits
                 .iter_mut()
-                .map(move |circuit| (node, circuit))
+                .enumerate()
+                .map(move |(segment, circuit)| (EncodedCircuitId { region, segment }, circuit))
         })
     }
 }
 
 impl<Node: HugrNode + Send + Sync> EncodedCircuit<Node> {
-    /// Returns a parallel iterator over every circuit segment and its region.
-    ///
-    /// A region containing multiple segments appears once for each segment.
-    // TODO: Update signature to return `(EncodedCircuitId<Node>, &SerialCircuit)` in a breaking release.
-    // See https://github.com/Quantinuum/tket2/issues/1901
-    pub fn par_iter(&self) -> impl ParallelIterator<Item = (Node, &SerialCircuit)> {
-        self.circuits.par_iter().flat_map_iter(|(&node, region)| {
-            region
-                .serial_circuits
+    /// Returns a parallel iterator over circuit segments and their identifiers.
+    pub fn par_iter(
+        &self,
+    ) -> impl ParallelIterator<Item = (EncodedCircuitId<Node>, &SerialCircuit)> {
+        self.circuits.par_iter().flat_map_iter(|(&region, info)| {
+            info.serial_circuits
                 .iter()
-                .map(move |circuit| (node, circuit))
+                .enumerate()
+                .map(move |(segment, circuit)| (EncodedCircuitId { region, segment }, circuit))
         })
     }
 
-    /// Returns a parallel mutable iterator over every circuit segment and its region.
-    ///
-    /// A region containing multiple segments appears once for each segment.
-    // TODO: Update signature to return `(EncodedCircuitId<Node>, &mut SerialCircuit)` in a breaking release.
-    // See https://github.com/Quantinuum/tket2/issues/1901
-    pub fn par_iter_mut(&mut self) -> impl ParallelIterator<Item = (Node, &mut SerialCircuit)> {
+    /// Returns a parallel mutable iterator over circuit segments and their identifiers.
+    pub fn par_iter_mut(
+        &mut self,
+    ) -> impl ParallelIterator<Item = (EncodedCircuitId<Node>, &mut SerialCircuit)> {
         self.circuits
             .par_iter_mut()
-            .flat_map_iter(|(&node, region)| {
-                region
-                    .serial_circuits
+            .flat_map_iter(|(&region, info)| {
+                info.serial_circuits
                     .iter_mut()
-                    .map(move |circuit| (node, circuit))
+                    .enumerate()
+                    .map(move |(segment, circuit)| (EncodedCircuitId { region, segment }, circuit))
             })
-    }
-}
-
-/// Backwards-compatible region indexing that ignores all but the first segment.
-/// This implementation will be removed in a breaking release.
-impl<Node: HugrNode> Index<Node> for EncodedCircuit<Node> {
-    type Output = SerialCircuit;
-
-    fn index(&self, index: Node) -> &Self::Output {
-        self.circuits
-            .get(&index)
-            .and_then(|region| region.serial_circuits.first())
-            .unwrap_or_else(|| panic!("Indexing into a circuit that was not encoded: {index}"))
-    }
-}
-
-/// Backwards-compatible mutable region indexing that ignores all but the first segment.
-/// This implementation will be removed in a breaking release.
-impl<Node: HugrNode> IndexMut<Node> for EncodedCircuit<Node> {
-    fn index_mut(&mut self, index: Node) -> &mut Self::Output {
-        self.circuits
-            .get_mut(&index)
-            .and_then(|region| region.serial_circuits.first_mut())
-            .unwrap_or_else(|| panic!("Indexing into a circuit that was not encoded: {index}"))
     }
 }
 

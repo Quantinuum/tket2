@@ -1,5 +1,6 @@
 //! Intermediate structure for encoding Hugrs into [`SerialCircuit`]s.
 
+mod nonlocal;
 mod unit_generator;
 mod unsupported_tracker;
 mod value_tracker;
@@ -39,11 +40,6 @@ use crate::serialize::pytket::opaque::{OpaqueSubgraph, OpaqueSubgraphPayload};
 pub struct PytketEncoderContext<H: HugrView> {
     /// The name of the circuit being encoded.
     name: Option<String>,
-    /// Global phase value.
-    ///
-    /// Defaults to "0" unless the circuit has a [METADATA_PHASE] metadata
-    /// entry.
-    phase: String,
     /// Pytket command runs and the opaque boundaries separating them.
     segments: CircuitSegments,
     /// A tracker for qubit/bit/parameter values associated with the circuit's wires.
@@ -221,17 +217,8 @@ impl<H: HugrView> PytketEncoderContext<H> {
         .filter(|name| !name.is_empty())
         .cloned();
 
-        // Backwards compatibility only: The global phase parameter
-        // of pytket circuits is now encoded as explicit `tket.global_phase` operations instead.
-        #[expect(deprecated)]
-        let phase = match hugr.get_metadata::<metadata::PytketPhaseExpr>(region) {
-            Some(p) => p.to_string(),
-            None => "0".to_string(),
-        };
-
         Ok(Self {
             name: fn_name,
-            phase,
             segments: CircuitSegments::new(),
             values: ValueTracker::new(hugr, region, &config)?,
             unsupported: UnsupportedTracker::new(hugr),
@@ -283,7 +270,8 @@ impl<H: HugrView> PytketEncoderContext<H> {
         mut self,
         hugr: &H,
         region: H::Node,
-    ) -> Result<(EncodedCircuitInfo, OpaqueSubgraphs<H::Node>), PytketEncodeError<H::Node>> {
+    ) -> Result<(EncodedCircuitInfo<H::Node>, OpaqueSubgraphs<H::Node>), PytketEncodeError<H::Node>>
+    {
         // Add any remaining unsupported nodes
         while !self.unsupported.is_empty() {
             let node = self.unsupported.iter().next().unwrap();
@@ -291,6 +279,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
             self.emit_unsupported(&opaque_subgraphs, hugr)?;
         }
 
+        let nonlocal_outputs = self.collect_nonlocal_outputs(hugr, region);
         let tracker_result = self.values.finish(hugr, region)?;
         let (mut command_runs, mut boundaries) = self.segments.finish();
         if command_runs.is_empty() {
@@ -313,11 +302,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
             .into_iter()
             .enumerate()
             .map(|(segment, commands)| {
-                let phase = if segment == 0 {
-                    self.phase.clone()
-                } else {
-                    "0".to_owned()
-                };
+                let phase = "0".to_owned();
                 let mut circuit = SerialCircuit::new(self.name.clone(), phase);
                 circuit.commands = commands;
                 circuit.qubits = qubits.clone();
@@ -338,6 +323,7 @@ impl<H: HugrView> PytketEncoderContext<H> {
             straight_through_wires: tracker_result.straight_through_wires,
             output_qubits: tracker_result.qubit_outputs,
             output_bits: tracker_result.bit_outputs,
+            nonlocal_outputs,
         };
 
         Ok((info, self.opaque_subgraphs))

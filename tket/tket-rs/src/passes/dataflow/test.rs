@@ -320,6 +320,42 @@ fn test_conditional() {
     assert_eq!(results.case_reachable(cond.node()), None);
 }
 
+#[test]
+#[should_panic(expected = "Conditional child must be a case")]
+fn test_conditional_rejects_non_case_child() {
+    use hugr_core::hugr::internal::HugrMutInternals;
+    use hugr_core::ops::DFG;
+
+    let mut builder = DFGBuilder::new(Signature::new_endo([bool_t()])).unwrap();
+    let [condition] = builder.input_wires_arr();
+    let mut conditional = builder
+        .conditional_builder(
+            (vec![type_row![], type_row![]], condition),
+            [],
+            vec![bool_t()].into(),
+        )
+        .unwrap();
+    let mut case = conditional.case_builder(0).unwrap();
+    let output = case.add_load_value(Value::false_val());
+    let case = case.finish_with_outputs([output]).unwrap();
+    let mut other_case = conditional.case_builder(1).unwrap();
+    let output = other_case.add_load_value(Value::true_val());
+    other_case.finish_with_outputs([output]).unwrap();
+    let conditional = conditional.finish_sub_container().unwrap();
+    let mut hugr = builder
+        .finish_hugr_with_outputs(conditional.outputs())
+        .unwrap();
+
+    let signature = hugr
+        .get_optype(case.node())
+        .as_case()
+        .unwrap()
+        .signature
+        .clone();
+    hugr.replace_op(case.node(), DFG { signature });
+    Machine::new(&hugr).run_subtree(TestContext, hugr.entrypoint());
+}
+
 // A Hugr being a function on bools: (x, y) => (x XOR y, x AND y)
 #[fixture]
 fn xor_and_cfg() -> Hugr {
