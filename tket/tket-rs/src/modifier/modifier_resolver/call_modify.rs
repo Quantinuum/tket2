@@ -9,8 +9,25 @@ use hugr::{
     ops::{Call, CallIndirect, DataflowOpTrait, LoadFunction, OpType},
 };
 
-use super::{ModifierResolver, ModifierResolverErrors};
+use super::{DEBUGINFO_META_KEY, ModifierResolver, ModifierResolverErrors};
 use crate::extension::modifier::Modifier;
+
+/// A rewritten call or loader keeps its own source location even if the original
+/// loader was shared or the replacement call needs extra control-array operations.
+fn add_replacement<H: HugrView>(
+    source: &H,
+    old: H::Node,
+    new_dfg: &mut impl Dataflow,
+    op: impl Into<OpType>,
+) -> hugr::Node {
+    let new = new_dfg.add_child_node(op);
+    if let Some(record) = source.get_metadata_any(old, DEBUGINFO_META_KEY) {
+        new_dfg
+            .hugr_mut()
+            .set_metadata_any(new, DEBUGINFO_META_KEY, record.clone());
+    }
+    new
+}
 
 impl<N: HugrNode> ModifierResolver<N> {
     pub(super) fn modify_call(
@@ -33,7 +50,7 @@ impl<N: HugrNode> ModifierResolver<N> {
 
         let Some(new_callee) = self.modify_fn_if_needed(h, callee.0, Some(&old_signature))? else {
             // If the function need not be modified, just copy the Call node as is.
-            let new = self.add_node_no_modification(h, call_node, call.clone(), new_dfg)?;
+            let new = self.add_node_no_modification(h, call_node, new_dfg)?;
             self.call_map_insert(callee.0, (new, call.called_function_port()));
             return Ok(());
         };
@@ -44,7 +61,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         self.modify_signature(poly_sig.body_mut(), false);
         let new_call = Call::try_new(poly_sig, type_args).map_err(BuildError::from)?;
         let new_call_fn_port = new_call.called_function_port();
-        let new_call_node = new_dfg.add_child_node(new_call);
+        let new_call_node = add_replacement(h, call_node, new_dfg, new_call);
 
         self.call_map_insert(new_callee, (new_call_node, new_call_fn_port));
 
@@ -209,7 +226,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         if !self.signature_has_quantum_data(&indir_call.signature)
             && Modifier::from_optype(h.get_optype(call_indirect_input)).is_none()
         {
-            self.add_node_no_modification(h, ind_call_node, indir_call.clone(), new_dfg)?;
+            self.add_node_no_modification(h, ind_call_node, new_dfg)?;
             return Ok(());
         }
 
@@ -225,7 +242,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             })?;
 
         // Insert the modified loader into the new graph.
-        let new_load_node = new_dfg.add_child_node(new_load_op);
+        let new_load_node = add_replacement(h, load_node, new_dfg, new_load_op);
         self.call_map_insert(modified_fn, (new_load_node, IncomingPort::from(0)));
         self.wire_state_order(
             load_node,
@@ -237,7 +254,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         // Construct the replacement IndirectCall with additional control-array inputs and outputs.
         let mut new_ind_call = indir_call.clone();
         self.modify_signature(&mut new_ind_call.signature, false);
-        let new_call_node = new_dfg.add_child_node(new_ind_call);
+        let new_call_node = add_replacement(h, ind_call_node, new_dfg, new_ind_call);
 
         // Pack the current control qubits into the arrays expected by the call.
         let mut controls = self.pack_controls(new_dfg)?;
@@ -294,7 +311,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             return self.forget_node(h, n);
         }
         // Plain LoadFunction values still need their static edge restored.
-        let new = self.add_node_no_modification(h, n, load.clone(), new_dfg)?;
+        let new = self.add_node_no_modification(h, n, new_dfg)?;
         let (loaded_func, _) =
             h.single_linked_output(n, load.function_port())
                 .ok_or_else(|| {
@@ -478,6 +495,55 @@ mod tests {
             assert_eq!(successors, HashSet::from([markers[2], markers[3]]));
         }
         h.validate().unwrap();
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
+    fn replacement_loaders_and_calls_keep_their_own_locations() {
+        use serde_json::json;
+        let (mut h, inner) = modifier_test_hugr(
+            2,
+            1,
+            |module, _| ordered_loader_function(module, 2, None),
+            false,
+        );
+        let main = h.entrypoint();
+        // Each caller has its own loader location. The inner loader is shared by two calls.
+        let location = |line| json!({"kind": "location", "line_no": line, "column": 1});
+        for (caller, line) in [(main, 10), (inner, 20)] {
+            let children = h.children(caller).collect_vec();
+            let mut call_line = line;
+            for n in children {
+                if h.get_optype(n).is_load_function() {
+                    h.set_metadata_any(n, DEBUGINFO_META_KEY, location(line));
+                } else if h.get_optype(n).is_call_indirect() {
+                    call_line += 1;
+                    h.set_metadata_any(n, DEBUGINFO_META_KEY, location(call_line));
+                }
+            }
+        }
+        test_resolve(&mut h);
+        let rebuilt =
+            dfg_modify::find_module_func_by_name(&h, "__modified__ordered_loader[C1]").unwrap();
+        for (caller, line, count) in [(main, 10, 1), (rebuilt, 20, 2)] {
+            let mut call_lines = Vec::new();
+            for call in h
+                .children(caller)
+                .filter(|&n| h.get_optype(n).is_call_indirect())
+            {
+                let (loader, _) = h.single_linked_output(call, 0).unwrap();
+                assert_eq!(
+                    h.get_metadata_any(loader, DEBUGINFO_META_KEY),
+                    Some(&location(line))
+                );
+                let info = h
+                    .get_metadata::<hugr_core::metadata::LocationRecord>(call)
+                    .unwrap();
+                call_lines.push(info.line_no);
+            }
+            call_lines.sort_unstable();
+            assert_eq!(call_lines, (line + 1..=line + count).collect_vec());
+        }
     }
 
     #[rstest::rstest]

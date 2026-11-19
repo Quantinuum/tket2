@@ -27,7 +27,7 @@ use petgraph::visit::{Topo, Walker};
 
 use crate::extension::{global_phase::GlobalPhase, modifier::Modifier};
 
-use super::{DirWire, ModifierResolver, ModifierResolverErrors, PortExt};
+use super::{DirWire, ModifierResolver, ModifierResolverErrors, PortExt, copy_debug_info_within};
 
 use crate::metadata;
 
@@ -608,6 +608,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             h.module_root(),
             new_fn.hugr().get_optype(local_function_node).clone(),
         );
+        copy_debug_info_within(h, func, new_function_node);
         self.modified_impls.insert(cache_key, new_function_node);
 
         let modify_result = self.modify_dfg_body(h, func, &mut new_fn);

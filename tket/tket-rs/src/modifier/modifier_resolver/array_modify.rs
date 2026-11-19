@@ -70,7 +70,7 @@ impl<N: HugrNode> ModifierResolver<N> {
     ) -> Result<bool, ModifierResolverErrors<N>> {
         // no modification is needed if not under dagger, or the array element type is not qubit
         if !self.modifiers().dagger || !self.qubit_finder.contains_element_type(&op.elem_ty) {
-            self.add_node_no_modification(h, n, op, new_dfg)?;
+            self.add_node_no_modification(h, n, new_dfg)?;
             return Ok(true);
         }
 
@@ -125,7 +125,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         let op_def = &op.def;
         // no modification is needed if not under dagger, or the array element type is not qubit
         if !self.modifiers().dagger || !self.qubit_finder.contains_element_type(&op.elem_ty) {
-            self.add_node_no_modification(h, n, op, new_dfg)?;
+            self.add_node_no_modification(h, n, new_dfg)?;
         } else {
             let new_op_def: GenericArrayOpDef<AK> = match op_def {
                 swap => swap,
@@ -173,13 +173,13 @@ impl<N: HugrNode> ModifierResolver<N> {
         // try some general array convert - no modification is needed if the array element type is not qubit
         let node = if let Ok(op) = BArrayToArray::from_extension_op(op) {
             if !self.modifiers().dagger || !self.qubit_finder.contains_element_type(&op.elem_ty) {
-                self.add_node_no_modification(h, n, optype.clone(), new_dfg)?;
+                self.add_node_no_modification(h, n, new_dfg)?;
                 return Ok(true);
             }
             new_dfg.add_child_node(BArrayFromArray::new(op.elem_ty, op.size))
         } else if let Ok(op) = BArrayFromArray::from_extension_op(op) {
             if !self.modifiers().dagger || !self.qubit_finder.contains_element_type(&op.elem_ty) {
-                self.add_node_no_modification(h, n, optype.clone(), new_dfg)?;
+                self.add_node_no_modification(h, n, new_dfg)?;
                 return Ok(true);
             }
             new_dfg.add_child_node(BArrayToArray::new(op.elem_ty, op.size))
