@@ -98,6 +98,11 @@ fn validate_ancillas(graph: &PauliGraph, budget: usize) {
     for q in n_qubits - budget..n_qubits {
         let idle = graph.get_ops().iter().all(|op| match op {
             Op::Rotation { data } => data.get_string()[q] == Pauli::I,
+            Op::Measure { data } => data.get_string()[q] == Pauli::I,
+            // A measurement gate stores its classical destination after its qubit.
+            Op::Gate { data } if *data.get_gate_type() == GateType::Measure => {
+                data.get_args()[0] != q
+            }
             Op::Gate { data } => !data.get_args().contains(&q),
             Op::Tableau { data } => {
                 data.get_x_images()[q] == identity.get_x_images()[q]
@@ -257,7 +262,26 @@ fn remove_nodes(
 mod tests {
     use super::*;
     use std::collections::HashSet;
-    use tk_pg_core::RotationData;
+    use tk_pg_core::{MeasureData, RotationData};
+
+    #[test]
+    fn measurement_bit_can_share_ancilla_index() {
+        let graph = PauliGraph::new(2).with_ops(vec![Op::Gate {
+            data: GateData::new(GateType::Measure, vec![0, 1]),
+        }]);
+
+        assert_eq!(optimize(&graph, 1, 2), graph);
+    }
+
+    #[test]
+    #[should_panic(expected = "Reserved ancilla qubit 1 is not idle")]
+    fn pauli_measurement_cannot_touch_reserved_ancilla() {
+        let graph = PauliGraph::new(2).with_ops(vec![Op::Measure {
+            data: MeasureData::new(vec![Pauli::I, Pauli::Z], false, 0),
+        }]);
+
+        optimize(&graph, 1, 1);
+    }
 
     fn get_batch_indices(pauli_graph: &PauliGraph, budget: usize) -> Vec<Vec<usize>> {
         batch_indices(pauli_graph, budget)
