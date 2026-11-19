@@ -382,12 +382,13 @@ impl<N: HugrNode> ModifierResolver<N> {
             .as_func_defn()
             .map(|defn| defn.func_name().to_string())
             .unwrap_or_default();
+
+        // Custom powered function are not supported (so far)
+        if !self.modifiers().exponent_inputs.is_empty() {
+            return Ok(None);
+        }
         let requested_control_qubits = self.control_num();
 
-        assert!(
-            self.modifiers().exponent_inputs.is_empty(),
-            "Custom implementations must not inherit power exponents."
-        );
         match (requested_control_qubits, self.modifiers().dagger) {
             (0, true) => {
                 let Some(impl_name) = h
@@ -568,14 +569,18 @@ impl<N: HugrNode> ModifierResolver<N> {
         })
     }
 
-    /// Rebuilds a modifier block's function with the combined modifiers.
-    /// A Modifier block is a wrapper that contains the computation to be modified,
-    ///  thus it cannot have custom implementations.
-    pub(crate) fn modify_modifier_block(
+    /// Generates a new function modified by the combined modifier.
+    pub(crate) fn modify_fn(
         &mut self,
         h: &mut impl HugrMut<Node = N>,
         func: N,
     ) -> Result<N, ModifierResolverErrors<N>> {
+        // We first check for custom implementations.
+        if let Some(custom_func) = self.find_custom_implementation(h, func)? {
+            let custom_fn = self.custom_implementation_adapter(h, func, custom_func)?;
+            return Ok(custom_fn);
+        }
+
         self.modify_fn_inner(h, func)
     }
 
@@ -1466,7 +1471,7 @@ mod test {
         }
         let mut h = module.finish_hugr().unwrap();
         let modified = controlled_resolver()
-            .modify_modifier_block(&mut h, recursive.node())
+            .modify_fn(&mut h, recursive.node())
             .unwrap();
         h.validate().unwrap();
 
@@ -1528,12 +1533,8 @@ mod test {
                             power_count
                         ],
                     };
-                    let first = resolver
-                        .modify_modifier_block(&mut h, original.node())
-                        .unwrap();
-                    let second = resolver
-                        .modify_modifier_block(&mut h, original.node())
-                        .unwrap();
+                    let first = resolver.modify_fn(&mut h, original.node()).unwrap();
+                    let second = resolver.modify_fn(&mut h, original.node()).unwrap();
                     assert_eq!(first, second);
                     assert!(implementations.insert(first));
                 }
@@ -1618,9 +1619,7 @@ mod test {
             exponent_inputs: vec![(original.node(), IncomingPort::from(1)); power_count],
         };
 
-        let modified = resolver
-            .modify_modifier_block(&mut h, original.node())
-            .unwrap();
+        let modified = resolver.modify_fn(&mut h, original.node()).unwrap();
 
         assert_eq!(
             h.get_optype(modified).as_func_defn().unwrap().func_name(),
@@ -1638,12 +1637,10 @@ mod test {
         h.set_metadata::<metadata::DaggeredImplementation>(original.node(), "custom".to_string());
         let mut resolver = dagger_resolver();
 
-        let modified = resolver
-            .modify_fn_if_needed(&mut h, original.node(), None)
-            .unwrap();
+        let modified = resolver.modify_fn(&mut h, original.node()).unwrap();
 
         // Custom dispatch must precede the shortcut for signatures without quantum data.
-        assert_eq!(modified, Some(custom.node()));
+        assert_eq!(modified, custom.node());
         h.validate().unwrap();
     }
 
@@ -1827,7 +1824,7 @@ mod test {
         );
 
         let error = dagger_resolver()
-            .modify_fn_if_needed(&mut h, original.node(), None)
+            .modify_fn(&mut h, original.node())
             .unwrap_err();
 
         assert_matches!(error, ModifierResolverErrors::Unreachable { msg } => {
@@ -1845,7 +1842,7 @@ mod test {
         h.set_metadata::<metadata::DaggeredImplementation>(original.node(), "missing".to_string());
 
         let error = dagger_resolver()
-            .modify_fn_if_needed(&mut h, original.node(), None)
+            .modify_fn(&mut h, original.node())
             .unwrap_err();
 
         assert_matches!(error, ModifierResolverErrors::Unreachable { msg } => {
@@ -1866,7 +1863,7 @@ mod test {
         h.set_metadata::<metadata::DaggeredImplementation>(original.node(), "custom".to_string());
 
         let error = dagger_resolver()
-            .modify_fn_if_needed(&mut h, original.node(), None)
+            .modify_fn(&mut h, original.node())
             .unwrap_err();
 
         assert_matches!(error, ModifierResolverErrors::UnResolvable { node, msg, optype } => {
@@ -1895,7 +1892,7 @@ mod test {
         h.set_metadata::<metadata::NumControlQubits>(custom.node(), 1);
 
         let error = controlled_resolver()
-            .modify_fn_if_needed(&mut h, original.node(), None)
+            .modify_fn(&mut h, original.node())
             .unwrap_err();
 
         assert_matches!(error, ModifierResolverErrors::UnResolvable { node, msg, optype } => {
@@ -1922,7 +1919,7 @@ mod test {
         h.set_metadata::<metadata::NumControlQubits>(custom.node(), 1);
 
         let error = controlled_resolver()
-            .modify_fn_if_needed(&mut h, original.node(), None)
+            .modify_fn(&mut h, original.node())
             .unwrap_err();
 
         assert_matches!(error, ModifierResolverErrors::UnResolvable { node, msg, optype } => {
@@ -1951,7 +1948,7 @@ mod test {
         );
 
         let error = controlled_resolver()
-            .modify_fn_if_needed(&mut h, original.node(), None)
+            .modify_fn(&mut h, original.node())
             .unwrap_err();
 
         assert_matches!(error, ModifierResolverErrors::Unreachable { msg } => {
@@ -2021,9 +2018,7 @@ mod test {
 
         // Test power resolution
         power_resolver.modifiers.exponent_inputs = vec![(original.node(), IncomingPort::from(0))];
-        let powered = power_resolver
-            .modify_modifier_block(&mut h, original.node())
-            .unwrap();
+        let powered = power_resolver.modify_fn(&mut h, original.node()).unwrap();
         h.validate().unwrap();
 
         let mut resolver = ModifierResolver::new();
@@ -2034,7 +2029,7 @@ mod test {
             exponent_inputs: vec![],
         };
         // Test power + optional control/dagger
-        let modified = resolver.modify_modifier_block(&mut h, powered).unwrap();
+        let modified = resolver.modify_fn(&mut h, powered).unwrap();
         h.validate().unwrap();
 
         let tail_loop = h
@@ -2084,9 +2079,7 @@ mod test {
         // The rebuilt loop must retain its power-loop marker.
         assert_eq!(h.get_metadata::<IsPowerLoop>(tail_loop), Some(true));
         // The preserved marker must allow another dagger of the rebuilt loop.
-        dagger_resolver()
-            .modify_modifier_block(&mut h, modified)
-            .unwrap();
+        dagger_resolver().modify_fn(&mut h, modified).unwrap();
         h.validate().unwrap();
     }
 
