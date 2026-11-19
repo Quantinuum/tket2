@@ -10,11 +10,11 @@ use hugr::{
 };
 use hugr_core::types::{Type, TypeRowRV};
 
-/// A modifier that repeats a function according to a runtime 64-bit integer exponent.
+/// A modifier that repeats a function according to a runtime unsigned 64-bit exponent.
 ///
 /// The function must return its leading INOUT inputs in order and may take
 /// additional copyable inputs, which are reused unchanged on every iteration.
-/// Non-positive exponents, interpreted as signed integers, leave the INOUT inputs unchanged.
+/// An exponent of zero skips the function and returns its INOUT inputs unchanged.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub struct ModifierPower;
 
@@ -46,7 +46,7 @@ impl ModifierPower {
     /// `L` is the row of leading INOUT inputs and outputs, which may include
     /// copyable types. `C` is the row of additional copyable inputs. Its bound
     /// allows the resolver to reuse `C` on every iteration of the generated
-    /// `TailLoop`. `int<6>` is HUGR's 64-bit integer type.
+    /// `TailLoop`. The resolver interprets the HUGR `int<6>` exponent as unsigned.
     pub(crate) fn signature() -> SignatureFunc {
         PolyFuncTypeRV::new(
             [

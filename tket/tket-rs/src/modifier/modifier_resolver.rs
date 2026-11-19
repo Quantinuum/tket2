@@ -89,11 +89,11 @@
 //! We also should not forget to connect `fneg` to `Rx` in the new graph, whose edge/wires has
 //! no correspondence in the original graph.
 //!
-//! Power modifiers add runtime 64-bit exponent inputs to the replacement call.
-//! Exponents in the same chain are multiplied to obtain a signed repetition count.
-//! Non-positive counts return the leading INOUT inputs unchanged; positive counts
-//! run a `TailLoop`, feeding INOUT outputs into each iteration and reusing trailing
-//! input-only parameters.
+//! Each power modifier adds an unsigned 64-bit exponent input to the replacement call.
+//! The resolver multiplies exponents in the same chain to obtain the runtime
+//! repetition count. A zero count returns the leading INOUT inputs unchanged.
+//! For a positive count, a `TailLoop` runs the body that many times, feeding INOUT
+//! outputs into the next iteration and reusing trailing input-only parameters.
 //!
 //! Control and dagger modify the repeated body; nested modifier chains resolve
 //! their powers independently. Generated loops carry `tket.power_loop` metadata

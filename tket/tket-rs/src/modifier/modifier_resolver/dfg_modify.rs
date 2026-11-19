@@ -699,7 +699,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             )
             .unwrap();
 
-        // Non-positive exponents return the leading INOUT inputs unchanged.
+        // A zero exponent returns the leading INOUT inputs unchanged.
         let case0_b = cond_builder.case_builder(0).unwrap();
         let case0_outputs = case0_b.input_wires().take(inout_count);
         case0_b.finish_with_outputs(case0_outputs)?;
@@ -738,7 +738,7 @@ impl<N: HugrNode> ModifierResolver<N> {
         loop_signature: &Signature,
         input_wires: Vec<Wire>,
     ) -> Result<(Wire, Vec<Wire>), ModifierResolverErrors<N>> {
-        // Decrement the exponent and check if positive
+        // Stop after this iteration if decrementing the exponent reaches zero.
         let one_wire = tl_b.add_load_value(ConstInt::new_s(6, 1).unwrap());
         let exponent_input = *input_wires
             .last()
@@ -1186,19 +1186,19 @@ impl<N: HugrNode> ModifierResolver<N> {
     }
 }
 
-/// Checks whether a signed 64-bit exponent is greater than zero.
+/// Checks whether the unsigned 64-bit exponent is greater than zero.
 fn check_positive(builder: &mut impl Dataflow, exponent: Wire) -> Result<Wire, BuildError> {
     let zero = builder.add_load_value(ConstInt::new_s(6, 0).unwrap());
     Ok(builder
-        .add_dataflow_op(IntOpDef::igt_s.with_log_width(6), [exponent, zero])?
+        .add_dataflow_op(IntOpDef::igt_u.with_log_width(6), [exponent, zero])?
         .out_wire(0))
 }
 
-/// Checks whether a signed 64-bit exponent is less than zero.
+/// Checks whether the unsigned 64-bit exponent has reached zero.
 fn check_negative(builder: &mut impl Dataflow, exponent: Wire) -> Result<Wire, BuildError> {
     let zero = builder.add_load_value(ConstInt::new_s(6, 0).unwrap());
     Ok(builder
-        .add_dataflow_op(IntOpDef::ile_s.with_log_width(6), [exponent, zero])?
+        .add_dataflow_op(IntOpDef::ile_u.with_log_width(6), [exponent, zero])?
         .out_wire(0))
 }
 
