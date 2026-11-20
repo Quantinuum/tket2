@@ -32,7 +32,7 @@ def test_phased_xx_lowering(theta: float, phi: float) -> None:
     # Entangle each input with a reference so one state result contains every
     # column of the unitary, including the relative phases between columns.
     main = Function("main", [])
-    q0, q1, r0, r1 = [main.add_op(quantum.qAlloc) for _ in range(4)]
+    q0, q1, r0, r1 = [main.add_op(quantum.qAlloc).out(0) for _ in range(4)]
     r0, q0 = main.add_op(quantum.CX, main.add_op(quantum.H, r0), q0)
     r1, q1 = main.add_op(quantum.CX, main.add_op(quantum.H, r1), q1)
     phased_xx = qsystem_sol.phasedXX
@@ -40,7 +40,7 @@ def test_phased_xx_lowering(theta: float, phi: float) -> None:
         phased_xx, q0, q1, main.load(FloatVal(theta)), main.load(FloatVal(phi))
     )
 
-    qubit_types = [tys.Qubit] * 4
+    qubit_types: tys.TypeRow = [tys.Qubit] * 4
     array_type = Array(tys.Qubit, 4)
     args = [tys.BoundedNatArg(4), tys.TypeTypeArg(tys.Qubit)]
     pack = ARRAY_EXTENSION.get_op("new_array").instantiate(
