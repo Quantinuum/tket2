@@ -99,9 +99,8 @@
 //! #### Exponent overflow in the current resolver
 //!
 //! The resolver currently combines exponents with HUGR's [64-bit `imul`], which
-//! wraps modulo `2^64`. Two exponents of `2^32` on one chain produce a loop
-//! count of zero. A three-qubit cycle should rotate once in this case because
-//! `2^64 mod 3 = 1`.
+//! wraps modulo `2^64`. This may give incorrect results for nested powers with
+//! very large exponents.
 //!
 //! ## Not supported:
 //!
