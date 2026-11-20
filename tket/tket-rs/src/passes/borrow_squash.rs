@@ -603,8 +603,8 @@ mod test {
         assert!(h.output_neighbours(cx1).all(|n| n == cx2));
     }
 
-        #[rstest]
-    fn order_edges(borrow_return_twice: (Hugr, [Wire; 4])) {
+    #[rstest]
+    fn order_edges(borrow_return_twice: (Hugr, [Wire; 4]), #[values(false, true)] call_between: bool) {
         let (mut h, [q, arr2, arr3, arr4]) = borrow_return_twice;
         let sig = Signature::new_endo([]);
         let func = h.add_node_with_parent(h.module_root(), FuncDecl::new("stateful", sig.clone()));
@@ -617,12 +617,11 @@ mod test {
             h.connect(func, func_p, c, call_port);
         }
         let [inp, out] = h.get_io(h.entrypoint()).unwrap();
-        h.add_other_edge(inp, q.node());
-        h.add_other_edge(q.node(), call1);
-        h.add_other_edge(call1, arr2.node());
-        h.add_other_edge(arr2.node(), call2);
-        h.add_other_edge(call2, arr3.node());
-        h.add_other_edge(arr3.node(), out);
+        let nodes = if call_between { [inp, q.node(), call1, arr2.node(), call2, arr3.node(), arr4.node(), out] }
+        else { [inp, q.node(), call1, arr2.node(), arr3.node(), call2, arr4.node(), out] };
+        for (a,b) in nodes.iter().tuple_windows() {
+            h.add_other_edge(*a, *b);
+        }
 
         h.validate().unwrap();
 
