@@ -262,8 +262,14 @@ fn borrow_squash_traversal<H: HugrMut<Node = Node>>(
         let outport = opty.other_output_port().unwrap();
         let order_succs = hugr.linked_inputs(n, outport).collect::<Vec<_>>();
         let order_preds = hugr.linked_outputs(n, inport).collect::<Vec<_>>();
-        for (pred, _) in order_preds {
-            for (succ, _) in &order_succs {
+        for (pred, order_outport) in order_preds {
+            let already_succs = hugr
+                .linked_inputs(pred, order_outport)
+                .collect::<HashSet<_>>();
+            for (succ, _) in order_succs
+                .iter()
+                .filter(|succ| !already_succs.contains(succ))
+            {
                 hugr.add_other_edge(pred, *succ);
             }
         }
