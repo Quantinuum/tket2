@@ -747,7 +747,7 @@ impl<N: HugrNode> ModifierResolver<N> {
             .add_dataflow_op(IntOpDef::isub.with_log_width(6), [exponent_input, one_wire])
             .unwrap()
             .out_wire(0);
-        let should_stop = check_negative(tl_b, exponent_count)?;
+        let should_stop = check_is_zero(tl_b, exponent_count)?;
 
         // Insert the loop body (i.e. the modifier block)
         // The loop body excludes the exponent and returns the INOUT values,
@@ -1195,7 +1195,7 @@ fn check_positive(builder: &mut impl Dataflow, exponent: Wire) -> Result<Wire, B
 }
 
 /// Checks whether the unsigned 64-bit exponent has reached zero.
-fn check_negative(builder: &mut impl Dataflow, exponent: Wire) -> Result<Wire, BuildError> {
+fn check_is_zero(builder: &mut impl Dataflow, exponent: Wire) -> Result<Wire, BuildError> {
     let zero = builder.add_load_value(ConstInt::new_s(6, 0).unwrap());
     Ok(builder
         .add_dataflow_op(IntOpDef::ile_u.with_log_width(6), [exponent, zero])?
