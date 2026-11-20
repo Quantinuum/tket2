@@ -1,6 +1,18 @@
 # Changelog
 
 
+## [0.23.1](https://github.com/Quantinuum/tket2/compare/tket-v0.23.0...tket-v0.23.1) - 2026-11-20
+
+### Bug Fixes
+
+- Handle order edges of global phase ops in modifier pass ([#2171](https://github.com/Quantinuum/tket2/pull/2171))
+
+### New Features
+
+- Propagate modifiers into classical containers with global phase ([#2162](https://github.com/Quantinuum/tket2/pull/2162))
+- Add no-op emitter for global phase ops ([#2175](https://github.com/Quantinuum/tket2/pull/2175))
+- Implement `power` modifier ([#2103](https://github.com/Quantinuum/tket2/pull/2103))
+
 ## [0.23.0](https://github.com/Quantinuum/tket2/compare/tket-v0.22.1...tket-v0.23.0) - 2026-11-12
 
 This release improves tuple normalization, modifier resolution, and constant-folding
