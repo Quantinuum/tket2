@@ -444,62 +444,6 @@ mod test {
         }
     }
 
-    #[rstest]
-    fn order_edges(borrow_return_twice: (Hugr, [Wire; 4])) {
-        let (mut h, [q, arr2, arr3, arr4]) = borrow_return_twice;
-        let sig = Signature::new_endo([]);
-        let func = h.add_node_with_parent(h.module_root(), FuncDecl::new("stateful", sig.clone()));
-        let call1 = h.add_node_with_parent(
-            h.entrypoint(),
-            Call::try_new(sig.clone().into(), []).unwrap(),
-        );
-        let call2 = h.add_node_with_parent(h.entrypoint(), Call::try_new(sig.into(), []).unwrap());
-        for c in [call1, call2] {
-            h.connect(
-                func,
-                h.get_optype(func).static_output_port().unwrap(),
-                c,
-                h.get_optype(c).static_input_port().unwrap(),
-            );
-        }
-        let [inp, out] = h.get_io(h.entrypoint()).unwrap();
-        h.add_other_edge(inp, q.node());
-        h.add_other_edge(q.node(), call1);
-        h.add_other_edge(call1, arr2.node());
-        h.add_other_edge(arr2.node(), call2);
-        h.add_other_edge(call2, arr3.node());
-        h.add_other_edge(arr3.node(), out);
-
-        h.validate().unwrap();
-
-        fn order_path_from(h: &Hugr, from: Node, to: Node) -> bool {
-            let order_outport = h.get_optype(from).other_output_port().unwrap();
-            // This is pretty inefficient if there are merges but fine for this test
-            for (n, _) in h.linked_inputs(from, order_outport) {
-                if n == to || order_path_from(h, n, to) {
-                    return true;
-                }
-            }
-            false
-        }
-
-        assert!(order_path_from(&h, inp, out));
-        assert!(order_path_from(&h, call1, call2));
-
-        BorrowSquashPass::default().run(&mut h).unwrap();
-        // Sanity check that squashing has removed correct nodes
-        for n in [q.node(), arr4.node(), call1, call2] {
-            assert!(h.contains_node(n))
-        }
-        for n in [arr2.node(), arr3.node()] {
-            assert!(!h.contains_node(n));
-        }
-        // and now check the order chain is intact (regression test for
-        // https://github.com/Quantinuum/tket2/issues/2154).
-        assert!(order_path_from(&h, inp, out));
-        assert!(order_path_from(&h, call1, call2));
-    }
-
     #[fixture]
     fn ranges_array() -> Hugr {
         let reader = BufReader::new(
@@ -657,6 +601,58 @@ mod test {
             );
         }
         assert!(h.output_neighbours(cx1).all(|n| n == cx2));
+    }
+
+        #[rstest]
+    fn order_edges(borrow_return_twice: (Hugr, [Wire; 4])) {
+        let (mut h, [q, arr2, arr3, arr4]) = borrow_return_twice;
+        let sig = Signature::new_endo([]);
+        let func = h.add_node_with_parent(h.module_root(), FuncDecl::new("stateful", sig.clone()));
+        let func_p = h.get_optype(func).static_output_port().unwrap();
+        let call_op = Call::try_new(sig.into(), []).unwrap();
+        let call_port = call_op.called_function_port();
+        let call1 = h.add_node_with_parent(h.entrypoint(), call_op.clone());
+        let call2 = h.add_node_with_parent(h.entrypoint(), call_op);
+        for c in [call1, call2] {
+            h.connect(func, func_p, c, call_port);
+        }
+        let [inp, out] = h.get_io(h.entrypoint()).unwrap();
+        h.add_other_edge(inp, q.node());
+        h.add_other_edge(q.node(), call1);
+        h.add_other_edge(call1, arr2.node());
+        h.add_other_edge(arr2.node(), call2);
+        h.add_other_edge(call2, arr3.node());
+        h.add_other_edge(arr3.node(), out);
+
+        h.validate().unwrap();
+
+        fn order_path_from(h: &Hugr, from: Node, to: Node) -> bool {
+            let order_outport = h.get_optype(from).other_output_port().unwrap();
+            // This is pretty inefficient if there are merges but fine for this test
+            for (n, _) in h.linked_inputs(from, order_outport) {
+                if n == to || order_path_from(h, n, to) {
+                    return true;
+                }
+            }
+            false
+        }
+
+        assert!(order_path_from(&h, inp, out));
+        assert!(order_path_from(&h, call1, call2));
+
+        BorrowSquashPass::default().run(&mut h).unwrap();
+        h.validate().unwrap();
+        // Sanity check that squashing has removed correct nodes
+        for n in [q.node(), arr4.node(), call1, call2] {
+            assert!(h.contains_node(n))
+        }
+        for n in [arr2.node(), arr3.node()] {
+            assert!(!h.contains_node(n));
+        }
+        // and now check the order chain is intact (regression test for
+        // https://github.com/Quantinuum/tket2/issues/2154).
+        assert!(order_path_from(&h, inp, out));
+        assert!(order_path_from(&h, call1, call2));
     }
 
     /// Captures (somewhere) dynamic borrow, return or both together
