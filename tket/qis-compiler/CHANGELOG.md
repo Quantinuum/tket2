@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.3](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.5.2...qis-compiler-v0.5.3) (2026-11-20)
+
+
+### Features
+
+* Add no-op emitter for global phase ops ([#2175](https://github.com/Quantinuum/tket2/issues/2175)) ([d7294f8](https://github.com/Quantinuum/tket2/commit/d7294f89d779a7a7a6e62447e59d0d027a507d1e))
+
 ## [0.5.2](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.5.1...qis-compiler-v0.5.2) (2026-11-12)
 
 This release fixes modifier resolution and a memory leak when recording array
