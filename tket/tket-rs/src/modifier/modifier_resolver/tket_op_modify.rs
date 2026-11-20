@@ -214,7 +214,7 @@ impl<N: HugrNode> ModifierResolver<N> {
 
                 // CPhase(cs,θ);
                 let theta_inputs = self.with_ancilla(&mut t, ancilla, |this, ancilla| {
-                    this.modify_global_phase(op_node, new_fn, ancilla)
+                    this.modify_global_phase(op_node, false, new_fn, ancilla)
                 })?;
                 pv_u.outgoing[0] = t.into();
                 for theta_in in theta_inputs {
