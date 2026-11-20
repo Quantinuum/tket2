@@ -23,6 +23,8 @@ conan = ["conan>=2.31.1,<3"]
 # `--only-group pg-libs` installs tools and the Python test worker without
 # building any of the tket Python packages.
 pg-libs = ["mypy>=2.3,<3", "ruff>=0.6", "pytket>=2,<3"]
+# Runtime for the QIS compiler integration tests.
+selene-tests = ["selene-sim==0.3.7"]
 
 [tool.uv]
 prerelease = "explicit"
