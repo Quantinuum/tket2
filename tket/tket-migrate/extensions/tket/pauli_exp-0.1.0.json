@@ -1,0 +1,14 @@
+{
+  "version": "0.1.0",
+  "name": "tket.pauli_exp",
+  "types": {},
+  "operations": {
+    "PauliExp": {
+      "extension": "tket.pauli_exp",
+      "name": "PauliExp",
+      "description": "exp(-i*pi*angle*(P0 tensor ... tensor P(n-1))/2). Inputs: n qubits, then a rotation in half-turns; outputs: n qubits in the same order. Static arguments: n and n Paulis (I=0, X=1, Y=2, Z=3). The empty string gives a global phase.",
+      "signature": null,
+      "binary": true
+    }
+  }
+}

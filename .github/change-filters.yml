@@ -19,6 +19,8 @@ tket:
   - "tket/tket1-passes/**"
   - "tket/qis-compiler/rust/**"
   - "tket/qis-compiler/Cargo.toml"
+  - "tket/tket-migrate/**"
+  - "tket/tket-exts/src/tket_exts/data/tket/**"
 
 pg-libs:
   - *rust-core

@@ -1,0 +1,34 @@
+{
+  "version": "0.1.0",
+  "name": "tket.argument",
+  "types": {},
+  "operations": {
+    "read_arg": {
+      "extension": "tket.argument",
+      "name": "read_arg",
+      "description": "Read a runtime argument of the given type identified by a string tag",
+      "signature": {
+        "params": [
+          {
+            "tp": "String"
+          },
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [],
+          "output": [
+            {
+              "t": "V",
+              "i": 1,
+              "b": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    }
+  }
+}
