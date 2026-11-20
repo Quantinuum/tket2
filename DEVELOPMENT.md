@@ -138,6 +138,57 @@ Pg-libs tests use stable features and include the Python worker integration
 tests. To test its nightly-only SIMD features, run
 `just pg-libs/test-rust-nightly`.
 
+### Testing pass semantics
+
+A semantic test checks the observable behaviour of a HUGR after a pass runs.
+Use Selene when the check needs to execute a quantum program. The integration
+tests run the pass with the local TKET bindings, compile the result with the
+local QIS compiler, and pass LLVM bitcode to Selene.
+
+1. Build a small HUGR that exercises the behaviour you want to check, or use a
+   fixture that contains the necessary control flow. For parameterized operations,
+   combine generated values with explicit cases such as zero, negative angles,
+   and the inputs that triggered a known bug.
+2. Apply the pass explicitly. Validate the resulting HUGR and check the expected
+   structural change before code generation. The QIS compiler runs rebasing and
+   modifier resolution itself, so compiling first can hide a pass that left an
+   operation unlowered or a modifier unresolved.
+3. Call `EmulatorState.from_python(lowered).compile_to_bitcode()`, pass the bytes to
+   `selene_sim.build()`, and run the resulting program with `QuestPlugin`. Use a
+   temporary build directory and set the qubit limit to what the test needs.
+   Capture the relevant state with `tket_exts.debug.state_result`, or check the
+   classical results or expected panic.
+4. Compare with a reference independent of the pass, such as an analytical
+   unitary or a checked-in expected result. For a rewrite, you can also run the
+   original program on the same inputs if the execution pipeline can run it
+   without applying the rewrite under test. For a unitary, cover every basis
+   input and preserve the relative phases between columns. Use an explicit
+   numerical tolerance and align a single global phase only where equivalence
+   up to global phase is part of the pass contract. For probabilistic
+   measurements, compare outcome distributions or check the state conditioned
+   on the measured outcome.
+
+The [QSystem semantics test](tket/qis-compiler/python/tests/test_qsystem_semantics.py)
+checks a parameterized lowering against its analytical unitary. It uses entangled
+reference qubits to capture every column in one run. The
+[modifier execution tests](test_files/run_modifier_examples/test_selene.py)
+check fixture programs against saved statevectors and cover an expected panic.
+
+After setting up LLVM and the native TKET libraries as described above, run the
+integration tests from the repository root.
+
+```sh
+uv sync --all-packages --group selene-tests
+uv run --no-sync pytest \
+    tket/qis-compiler/python/tests/test_qsystem_semantics.py \
+    test_files/run_modifier_examples/test_selene.py
+```
+
+The [QIS compiler CI job](.github/workflows/ci.yml) runs pytest over
+`tket/qis-compiler` and explicitly includes the modifier execution module. If you
+add a test module elsewhere, add it to that invocation and make sure the
+[`qis` change filter](.github/change-filters.yml) covers its inputs.
+
 ## 💅 Coding Style
 
 We use `rustfmt` and `ruff` to enforce a consistent coding style. The CI will fail if the code is not formatted correctly.
