@@ -16,6 +16,8 @@ use tk_pg_core::{PGPass, PauliGraph};
 use crate::optimizer::optimize;
 
 /// A T-count optimization pass for rotations, tableaux, and unconditional H gates.
+/// Measurements, resets, conditional gates, black boxes and non Clifford+T
+/// rotations separate optimization regions.
 #[derive(Default)]
 pub struct TOptimizationPass {
     ancilla_budget: usize,
@@ -43,9 +45,9 @@ impl TOptimizationPass {
         self
     }
 
-    /// Optimize a graph whose rotation angles are multiples of 0.25 half turns.
+    /// Optimize Clifford+T regions, preserving nonunitary operations and black boxes.
     ///
-    /// Panics if the input contains unsupported operations or non-idle reserved ancillas.
+    /// Panics if the input contains non-idle reserved ancillas.
     pub fn optimize(&self, graph: &PauliGraph) -> PauliGraph {
         optimize(graph, self.ancilla_budget, self.first_bit)
     }

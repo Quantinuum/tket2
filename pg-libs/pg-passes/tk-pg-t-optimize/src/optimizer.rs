@@ -6,11 +6,45 @@ use bitvec::prelude::*;
 use tk_pg_core::{GateData, GateType, Op, Pauli, PauliGraph, TableauData};
 use tk_pg_ir_kernels::{PGRewrite, PGTableau};
 use tk_pg_qm_tableau::Tableau;
+use tk_pg_utils::equiv_0;
 
 /// Optimize T count using the last `budget` qubits as reserved idle ancillas.
 pub fn optimize(pauli_graph: &PauliGraph, budget: usize, first_bit: usize) -> PauliGraph {
     validate_ancillas(pauli_graph, budget);
 
+    let width = pauli_graph.get_n_qubits();
+    let mut output = PauliGraph::new(width);
+    let mut region = PauliGraph::new(width);
+    let mut next_bit = first_bit;
+
+    for op in pauli_graph.get_ops() {
+        let boundary = match op {
+            Op::Rotation { data } => !equiv_0(data.get_angle(), 0.25),
+            Op::Tableau { .. } => false,
+            Op::Gate { data } => {
+                *data.get_gate_type() != GateType::H
+                    || !data.get_conditional_bits().is_empty()
+                    || !data.get_conditional_values().is_empty()
+            }
+            _ => true,
+        };
+        if boundary {
+            if !region.get_ops().is_empty() {
+                output.extend(optimize_region(&region, budget, &mut next_bit));
+                region = PauliGraph::new(width);
+            }
+            output.add_op(op.clone());
+        } else {
+            region.add_op(op.clone());
+        }
+    }
+    if !region.get_ops().is_empty() {
+        output.extend(optimize_region(&region, budget, &mut next_bit));
+    }
+    output
+}
+
+fn optimize_region(pauli_graph: &PauliGraph, budget: usize, next_bit: &mut usize) -> PauliGraph {
     let n_qubits = pauli_graph.get_n_qubits();
     let ancillas = n_qubits - budget..n_qubits;
     let (rotations, mut final_clifford) = normalize(pauli_graph);
@@ -22,7 +56,6 @@ pub fn optimize(pauli_graph: &PauliGraph, budget: usize, first_bit: usize) -> Pa
         output.add_op(Op::Gate { data: h });
     }
 
-    let mut next_bit = first_bit;
     for sub_graph in batch_rotations(&rotations, budget) {
         let rotations: Vec<_> = sub_graph
             .get_ops()
@@ -33,7 +66,7 @@ pub fn optimize(pauli_graph: &PauliGraph, budget: usize, first_bit: usize) -> Pa
             })
             .collect();
         let region = synthesize(&rotations, n_qubits);
-        let (prefix, mut diagonal, suffix) = gadgetize(region, budget, &mut next_bit);
+        let (prefix, mut diagonal, suffix) = gadgetize(region, budget, next_bit);
 
         t_optimization(&mut diagonal);
 
@@ -65,6 +98,11 @@ fn validate_ancillas(graph: &PauliGraph, budget: usize) {
     for q in n_qubits - budget..n_qubits {
         let idle = graph.get_ops().iter().all(|op| match op {
             Op::Rotation { data } => data.get_string()[q] == Pauli::I,
+            Op::Measure { data } => data.get_string()[q] == Pauli::I,
+            // A measurement gate stores its classical destination after its qubit.
+            Op::Gate { data } if *data.get_gate_type() == GateType::Measure => {
+                data.get_args()[0] != q
+            }
             Op::Gate { data } => !data.get_args().contains(&q),
             Op::Tableau { data } => {
                 data.get_x_images()[q] == identity.get_x_images()[q]
@@ -224,7 +262,26 @@ fn remove_nodes(
 mod tests {
     use super::*;
     use std::collections::HashSet;
-    use tk_pg_core::RotationData;
+    use tk_pg_core::{MeasureData, RotationData};
+
+    #[test]
+    fn measurement_bit_can_share_ancilla_index() {
+        let graph = PauliGraph::new(2).with_ops(vec![Op::Gate {
+            data: GateData::new(GateType::Measure, vec![0, 1]),
+        }]);
+
+        assert_eq!(optimize(&graph, 1, 2), graph);
+    }
+
+    #[test]
+    #[should_panic(expected = "Reserved ancilla qubit 1 is not idle")]
+    fn pauli_measurement_cannot_touch_reserved_ancilla() {
+        let graph = PauliGraph::new(2).with_ops(vec![Op::Measure {
+            data: MeasureData::new(vec![Pauli::I, Pauli::Z], false, 0),
+        }]);
+
+        optimize(&graph, 1, 1);
+    }
 
     fn get_batch_indices(pauli_graph: &PauliGraph, budget: usize) -> Vec<Vec<usize>> {
         batch_indices(pauli_graph, budget)

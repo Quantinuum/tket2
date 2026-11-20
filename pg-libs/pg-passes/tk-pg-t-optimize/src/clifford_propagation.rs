@@ -5,6 +5,7 @@ use tk_pg_core::{
 };
 use tk_pg_ir_kernels::{PGTableau, get_dagger};
 use tk_pg_qm_tableau::Tableau;
+use tk_pg_utils::equiv_0;
 
 /// Append a Clifford gate to the tableau.
 pub fn append_gate(frame: &mut Tableau, gate: &GateData) {
@@ -122,9 +123,8 @@ pub fn normalize(pg: &PauliGraph) -> (PauliGraph, Tableau) {
     for op in pg.get_ops() {
         match op {
             Op::Rotation { data } => {
-                let turns = 4.0 * data.get_angle();
                 assert!(
-                    turns.is_finite() && (turns - turns.round()).abs() <= 1e-10,
+                    equiv_0(data.get_angle(), 0.25),
                     "TODD requires multiples of 0.25 half turns"
                 );
                 if data.get_string().iter().all(|p| *p == Pauli::I) {
