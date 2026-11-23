@@ -262,6 +262,7 @@ fn test_fold_not() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 fn orphan_output() {
     // pseudocode:
     // x0 := bool(true)
@@ -296,6 +297,7 @@ fn orphan_output() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 fn test_folding_pass_issue_996() {
     // pseudocode:
     //
@@ -1257,6 +1259,7 @@ fn test_fold_itostring_s() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 fn test_fold_int_ops() {
     // pseudocode:
     //
@@ -1360,6 +1363,7 @@ fn tail_loop_hugr(int_cst: ConstInt) -> Hugr {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 fn test_tail_loop_unknown() {
     let cst5 = ConstInt::new_u(3, 5).unwrap();
     let mut h = tail_loop_hugr(cst5.clone());
@@ -1447,6 +1451,7 @@ fn test_tail_loop_unknown() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 fn test_tail_loop_never_iterates() {
     let mut h = tail_loop_hugr(ConstInt::new_u(4, 6).unwrap());
     ConstantFoldPass::default()
@@ -1457,6 +1462,7 @@ fn test_tail_loop_never_iterates() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 fn test_tail_loop_increase_termination() {
     let mut h = tail_loop_hugr(ConstInt::new_u(4, 6).unwrap());
     ConstantFoldPass::default()
@@ -1515,6 +1521,7 @@ fn cfg_hugr() -> Hugr {
 #[case(&[(0,true), (1,false)], true, true, Some(11))]
 #[case(&[(1,false)], true, true, None)]
 #[case(&[], false, false, None)]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 fn test_cfg(
     #[case] inputs: &[(usize, bool)],
     #[case] fold_entry: bool,
@@ -1594,6 +1601,7 @@ fn test_cfg(
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 fn test_module() -> Result<(), Box<dyn std::error::Error>> {
     let mut mb = ModuleBuilder::new();
     // Define a top-level constant, (only) the second of which can be removed

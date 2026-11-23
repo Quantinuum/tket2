@@ -804,9 +804,11 @@ mod test {
     }
 
     #[rstest]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case::global_helios(PassScope::Global(Preserve::Public), QSystemPlatform::Helios)]
     #[case::entrypoint_flat_helios(PassScope::EntrypointFlat, QSystemPlatform::Helios)]
     #[case::entrypoint_recursive_helios(PassScope::EntrypointRecursive, QSystemPlatform::Helios)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case::global_sol(PassScope::Global(Preserve::Public), QSystemPlatform::Sol)]
     #[case::entrypoint_flat_sol(PassScope::EntrypointFlat, QSystemPlatform::Sol)]
     #[case::entrypoint_recursive_sol(PassScope::EntrypointRecursive, QSystemPlatform::Sol)]
@@ -897,10 +899,15 @@ mod test {
     #[case(TketOp::Ry, QSystemPlatform::Sol, Some(vec![ExpectedOp::Sol(SolOp::PhasedX)]))]
     #[case(TketOp::Rz, QSystemPlatform::Sol, Some(vec![ExpectedOp::Sol(SolOp::Rz)]))]
     // multi qubit ordering is not deterministic
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case(TketOp::CX, QSystemPlatform::Helios, None)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case(TketOp::CY, QSystemPlatform::Helios, None)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case(TketOp::CZ, QSystemPlatform::Helios, None)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case(TketOp::CRz, QSystemPlatform::Helios, None)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case(TketOp::Toffoli, QSystemPlatform::Helios, None)]
     // Uncomment when rebasing is added
     //#[case(TketOp::CX, QSystemPlatform::Helios, None)]
@@ -910,8 +917,10 @@ mod test {
     //#[case(TketOp::Toffoli, QSystemPlatform::Helios, None)]
 
     // conditional doesn't fit in to commands
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case(TketOp::Measure, QSystemPlatform::Helios, None)]
     #[case(TketOp::QAlloc, QSystemPlatform::Helios, None)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     #[case(TketOp::Measure, QSystemPlatform::Sol, None)]
     #[case(TketOp::QAlloc, QSystemPlatform::Sol, None)]
     fn test_lower(
@@ -943,6 +952,7 @@ mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_build_func_uses_platform_specific_ops() {
         let helios = build_func(QSystemPlatform::Helios, TketOp::CX).unwrap();
         let helios_circuit = Circuit::new(&helios);
@@ -1061,6 +1071,7 @@ mod test {
     /// extension) and verify they are migrated to `tket.qsystem.helios` ops
     /// by [`lower_tk2_ops`].
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_migrate_legacy_qsystem_ops() {
         let mut h = legacy_qsystem_hugr();
 
@@ -1095,6 +1106,7 @@ mod test {
     /// Legacy `tket.qsystem::ZZPhase` ops targeting Sol are lowered via the
     /// cross-platform decomposition path (issue #1620).
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_legacy_qsystem_zz_phase_lowers_via_cross_platform_to_sol() {
         let mut h = legacy_qsystem_hugr();
         lower_tk2_ops(&mut h, Preserve::Public, QSystemPlatform::Sol).unwrap();
@@ -1112,6 +1124,7 @@ mod test {
     /// A `tket.qsystem.helios::ZZPhase` op targeting Sol is lowered via the
     /// cross-platform decomposition path (issue #1620).
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_helios_zz_phase_lowers_to_sol() {
         let mut b = FunctionBuilder::new("f", Signature::new_endo(type_row![])).unwrap();
         let [maybe_q1] = b
@@ -1145,6 +1158,7 @@ mod test {
     /// A `tket.qsystem.sol::PhasedXX` op targeting Helios is lowered via the
     /// cross-platform decomposition path.
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_sol_phased_xx_lowers_to_helios() {
         let mut b = FunctionBuilder::new("f", Signature::new_endo(type_row![])).unwrap();
         let [maybe_q1] = b
@@ -1183,6 +1197,7 @@ mod test {
     #[rstest]
     #[case::helios(QSystemPlatform::Helios)]
     #[case::sol(QSystemPlatform::Sol)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_lowering_runtime_barriers(#[case] platform: QSystemPlatform) {
         use crate::extension::qsystem::common::runtime_barrier_ext_op;
         use crate::extension::qsystem::{helios, sol};
@@ -1276,6 +1291,7 @@ mod test {
     #[rstest]
     #[case::from_helios_to_sol(QSystemPlatform::Helios, QSystemPlatform::Sol)]
     #[case::from_sol_to_helios(QSystemPlatform::Sol, QSystemPlatform::Helios)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_relowering_runtime_barrier_to_different_platform_fails(
         #[case] from_platform: QSystemPlatform,
         #[case] to_platform: QSystemPlatform,
@@ -1335,6 +1351,7 @@ mod test {
     #[rstest]
     #[case::helios_then_sol(QSystemPlatform::Helios, QSystemPlatform::Sol)]
     #[case::sol_then_helios(QSystemPlatform::Sol, QSystemPlatform::Helios)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_cross_platform_lowering_round_trip(
         #[case] first: QSystemPlatform,
         #[case] second: QSystemPlatform,
@@ -1402,6 +1419,7 @@ mod test {
     /// Two `TketOp::H` ops lowered to Helios should share exactly one
     /// `__tk2_helios_h` replacement function (deduplication via `OnMultiDefn::UseTarget`).
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_duplicate_tket_ops_produce_single_replacement_func() {
         let mut b = FunctionBuilder::new("f", Signature::new_endo(type_row![])).unwrap();
         let [q] = b.add_dataflow_op(TketOp::QAlloc, []).unwrap().outputs_arr();
@@ -1431,6 +1449,7 @@ mod test {
     /// (e.g. `Reset`, `TryQAlloc`) can be lowered to Sol directly. Helios-specific
     /// ops are remapped via the cross-platform decomposition path.
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_legacy_shared_qsystem_ops_lower_to_sol() {
         // Build a HUGR with only shared legacy ops (no ZZPhase).
         let mut b = FunctionBuilder::new("f", Signature::new_endo(type_row![])).unwrap();
@@ -1467,6 +1486,7 @@ mod test {
     #[rstest]
     #[case::helios(QSystemPlatform::Helios)]
     #[case::sol(QSystemPlatform::Sol)]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_measurements_removed(#[case] platform: QSystemPlatform) {
         let mut circuit = DFGBuilder::new(inout_sig(vec![qb_t(); 2], vec![bool_t()])).unwrap();
         let [q1, q2] = circuit.input_wires_arr();
@@ -1772,12 +1792,14 @@ mod test {
 
     /// Verify the fixture HUGR is valid before any lowering
     #[rstest]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_all_ops_hugr_is_valid(all_ops_hugr: hugr::Hugr) {
         all_ops_hugr.validate().unwrap();
     }
 
     /// Verify lowering the all-ops fixture to Helios
     #[rstest]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_lower_all_ops_to_helios(all_ops_hugr: hugr::Hugr) {
         let mut h = all_ops_hugr;
         lower_tk2_ops(&mut h, Preserve::Public, QSystemPlatform::Helios).unwrap();
@@ -1787,6 +1809,7 @@ mod test {
 
     /// Verify lowering the all-ops fixture to Sol
     #[rstest]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_lower_all_ops_to_sol(all_ops_hugr: hugr::Hugr) {
         let mut h = all_ops_hugr;
         lower_tk2_ops(&mut h, Preserve::Public, QSystemPlatform::Sol).unwrap();

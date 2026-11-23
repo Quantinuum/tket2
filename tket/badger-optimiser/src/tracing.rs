@@ -20,7 +20,7 @@ fn verbose_filter(metadata: &Metadata<'_>) -> bool {
     metadata.target().starts_with(LOG_TARGET) || metadata.target().starts_with(PROGRESS_TARGET)
 }
 
-#[allow(unused)]
+#[expect(dead_code)]
 fn metrics_filter(metadata: &Metadata<'_>) -> bool {
     metadata.target().starts_with(METRICS_TARGET)
 }

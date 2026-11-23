@@ -9,7 +9,9 @@ from unittest.mock import ANY, patch
 import hypothesis.strategies as st
 import numpy as np
 import pytest
+from hugr import ops, tys, val
 from hugr.build.base import Hugr
+from hugr.build.function import Function
 from hugr.package import Package
 from hypothesis import given, settings
 from hypothesis.strategies._internal import SearchStrategy
@@ -481,6 +483,29 @@ def test_issue_1516() -> None:
     opt_hugr = opt(hugr, inplace=False)
 
     CompilationState.from_python(opt_hugr).validate()
+
+
+@pytest.mark.parametrize("target", list(PlatformTarget))
+def test_guppy_2348_nonlocal_output(target: PlatformTarget) -> None:
+    """Check that the pytket roundtrip preserves non-local boolean uses.
+
+    Regression for https://github.com/Quantinuum/guppylang/issues/2348.
+    """
+    function = Function("nonlocal_output", [])
+    source = function.load(val.TRUE)
+    with function.add_nested() as nested:
+        # The boolean bypasses the nested region's input node. Replacing the
+        # outer region must reconnect this use before deleting the LoadConst.
+        consumer = nested.add_op(ops.Noop(tys.Bool), source)
+        nested.set_outputs(consumer)
+    function.set_outputs(nested.parent_node)
+    hugr = function.hugr
+    CompilationState.from_python(hugr).validate()
+
+    result = PytketHugrPass(RemoveRedundancies(), target=target).run(
+        hugr, inplace=False
+    )
+    CompilationState.from_python(result.hugr).validate()
 
 
 def test_python_qsystem_pass() -> None:

@@ -5,7 +5,6 @@ description = "Integration tests for Pauli graph rewrite kernels"
 edition = { workspace = true }
 rust-version = { workspace = true }
 license = { workspace = true }
-homepage = { workspace = true }
 repository = { workspace = true }
 # Keep tableau-dependent tests out of the published kernel crate to avoid a dependency cycle.
 publish = false

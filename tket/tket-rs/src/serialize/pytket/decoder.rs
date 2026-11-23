@@ -1,5 +1,6 @@
 //! Intermediate structure for decoding [`SerialCircuit`]s into [`Hugr`]s.
 
+mod nonlocal;
 mod param;
 mod subgraph;
 mod tracked_elem;
@@ -307,9 +308,9 @@ impl<'h> PytketDecoderContext<'h> {
     ///
     /// - `encoded_info`: Information stored while encoding the circuit, used to
     ///   recover its original structure.
-    pub(super) fn finish(
+    pub(super) fn finish<N: hugr::core::HugrNode>(
         mut self,
-        encoded_info: Option<&EncodedCircuitInfo>,
+        encoded_info: Option<&EncodedCircuitInfo<N>>,
     ) -> Result<Node, PytketDecodeError> {
         // Qubits and bits appearing at the output.
         let mut qubits: Vec<TrackedQubit> = Vec::new();

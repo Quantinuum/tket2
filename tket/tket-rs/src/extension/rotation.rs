@@ -340,6 +340,7 @@ mod test {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_builder() {
         let mut builder = DFGBuilder::new(Signature::new(
             [rotation_type()],

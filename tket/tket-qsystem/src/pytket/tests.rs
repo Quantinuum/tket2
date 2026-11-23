@@ -345,6 +345,7 @@ fn circuit_standalone_roundtrip(#[case] hugr: Hugr) {
     compare_serial_circs(ser, &reser);
 }
 
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 #[rstest]
 #[case::dropped_order_edge(circ_dropped_order_edge(), 1)]
 fn encoded_circuit_roundtrip(#[case] hugr: Hugr, #[case] num_circuits: usize) {
@@ -389,6 +390,7 @@ fn encoded_circuit_roundtrip(#[case] hugr: Hugr, #[case] num_circuits: usize) {
     );
 }
 
+#[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
 #[rstest]
 /// Regression test for <https://github.com/Quantinuum/tket2/issues/1410>
 ///

@@ -715,6 +715,7 @@ mod test {
     use crate::passes::replace_types::{DelegatingLinearizer, Linearizer};
 
     #[test]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
     fn test_borrow_array_discard() {
         let arr_ty = borrow_array_type(5, borrow_array_type(7, usize_t()));
         let dl = DelegatingLinearizer::default();
