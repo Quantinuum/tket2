@@ -20,6 +20,8 @@ All the previous commands also update
 the `test_files/run_modifier_examples/hugr_results/` directory with `.npy` files
 containing simulation results, and regenerate the human-readable summary in
 `test_files/run_modifier_examples/hugr_results.txt`.
+The simulation uses LLVM bitcode from the local QIS compiler and the Selene
+runtime in the `selene-tests` dependency group.
 
 To recompile and run a single example, run
 `just tket/recompile-modifier <example_name>` from the repository root, or
