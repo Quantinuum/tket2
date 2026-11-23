@@ -13,8 +13,7 @@ use crate::error::{ReplacementError, VersionedElementError};
 
 /// Represents an Extension Op by its name, the extension it belongs to, and its version.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-// make it private
-pub struct VersionedElement {
+pub(crate) struct VersionedElement {
     id: String,
     // todo: use Extension here
     extension_id: String,
@@ -23,7 +22,7 @@ pub struct VersionedElement {
 
 impl VersionedElement {
     /// Identifies an operation or type within a specific extension version.
-    pub fn new(id: String, extension_id: String, version: Version) -> Self {
+    fn new(id: String, extension_id: String, version: Version) -> Self {
         Self {
             id,
             extension_id,
@@ -89,7 +88,7 @@ impl fmt::Display for VersionedElement {
 
 /// A recipe for creating the replacement
 #[derive(Clone, Debug)]
-pub enum OpReplacementTemplate {
+pub(crate) enum OpReplacementTemplate {
     /// An empty replacement template. States that the target should be removed.
     Empty,
     /// The recipe for creating the replacement.
@@ -129,7 +128,7 @@ impl OpReplacementTemplate {
 /// - `version`: version of the extension that the mapped (old) operations come from.
 /// - `map`: lookup from a versioned operation (name and version) to the
 ///   [`OpReplacementTemplate`] used to replace it.
-pub struct OpMapping {
+pub(crate) struct OpMapping {
     extension_id: String,
     version: Version,
     map: HashMap<VersionedElement, OpReplacementTemplate>,
@@ -137,7 +136,7 @@ pub struct OpMapping {
 
 impl OpMapping {
     /// Maps operation names from the given extension version to their replacements.
-    pub fn new(extension_id: String, version: Version) -> Self {
+    pub(crate) fn new(extension_id: String, version: Version) -> Self {
         Self {
             extension_id,
             version,
@@ -146,14 +145,14 @@ impl OpMapping {
     }
 
     /// Adds or overwrites the replacement for an operation in this extension version.
-    pub fn insert(&mut self, name: impl Into<String>, replacement: OpReplacementTemplate) {
+    pub(crate) fn insert(&mut self, name: impl Into<String>, replacement: OpReplacementTemplate) {
         let source =
             VersionedElement::new(name.into(), self.extension_id.clone(), self.version.clone());
         self.map.insert(source, replacement);
     }
 
     /// Adds multiple replacements at once.
-    pub fn insert_all(&mut self, entries: Vec<(impl Into<String>, OpReplacementTemplate)>) {
+    pub(crate) fn insert_all(&mut self, entries: Vec<(impl Into<String>, OpReplacementTemplate)>) {
         for (k, v) in entries {
             self.insert(k, v);
         }
@@ -172,7 +171,7 @@ impl OpMapping {
 /// - `extension_id`: identifier of the source extension.
 /// - `version`: version of the source extension.
 /// - `map`: replacement types keyed by the versioned source type.
-pub struct TypeMapping {
+pub(crate) struct TypeMapping {
     /// Identifier of the source extension.
     extension_id: String,
     /// Version of the source extension.
@@ -183,7 +182,7 @@ pub struct TypeMapping {
 
 impl TypeMapping {
     /// Creates an empty type mapping for the given extension version.
-    pub fn new(extension_id: String, version: Version) -> Self {
+    pub(crate) fn new(extension_id: String, version: Version) -> Self {
         Self {
             extension_id,
             version,
@@ -192,7 +191,7 @@ impl TypeMapping {
     }
 
     /// Adds or overwrites the replacement for a type in this extension version.
-    pub fn insert(&mut self, name: impl Into<String>, replacement: Type) {
+    pub(crate) fn insert(&mut self, name: impl Into<String>, replacement: Type) {
         let source =
             VersionedElement::new(name.into(), self.extension_id.clone(), self.version.clone());
         self.map.insert(source, replacement);

@@ -4,7 +4,7 @@ use hugr::{Node, builder::BuildError, extension::SignatureError, hugr::Validatio
 use thiserror::Error;
 use tket::passes::replace_types::ReplaceTypesError;
 
-use crate::VersionedElement;
+use crate::update_maps::VersionedElement;
 
 /// An extension is missing or cannot provide the requested operation or type.
 #[derive(Debug, Error)]

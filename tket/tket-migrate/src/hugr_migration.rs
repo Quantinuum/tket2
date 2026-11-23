@@ -83,7 +83,7 @@ pub(crate) mod test_helpers {
     const QUANTUM_EXTENSION: &str = "tket.quantum";
     const BOOL_EXTENSION: &str = "tket.bool";
 
-    pub(crate) fn load_registry(paths: &[PathBuf]) -> Result<ExtensionRegistry, Box<dyn Error>> {
+    pub(super) fn load_registry(paths: &[PathBuf]) -> Result<ExtensionRegistry, Box<dyn Error>> {
         let mut registry = STD_REG.to_owned();
         let extensions = paths
             .iter()
@@ -99,7 +99,7 @@ pub(crate) mod test_helpers {
         Ok(registry)
     }
 
-    pub(crate) fn build_old_hugr(registry: &ExtensionRegistry) -> Result<Hugr, Box<dyn Error>> {
+    pub(super) fn build_old_hugr(registry: &ExtensionRegistry) -> Result<Hugr, Box<dyn Error>> {
         let quantum = registry
             .get(QUANTUM_EXTENSION)
             .ok_or("tket.quantum is missing from the registry")?;
@@ -120,7 +120,7 @@ pub(crate) mod test_helpers {
         Ok(builder.finish_hugr_with_outputs([])?)
     }
 
-    pub(crate) fn build_bool_hugr(registry: &ExtensionRegistry) -> Result<Hugr, Box<dyn Error>> {
+    pub(super) fn build_bool_hugr(registry: &ExtensionRegistry) -> Result<Hugr, Box<dyn Error>> {
         let bool_extension = registry
             .get(BOOL_EXTENSION)
             .ok_or("tket.bool is missing from the registry")?;
@@ -157,7 +157,7 @@ pub(crate) mod test_helpers {
         Ok(builder.finish_hugr_with_outputs([output])?)
     }
 
-    pub(crate) fn build_bool_cfg_hugr(
+    pub(super) fn build_bool_cfg_hugr(
         registry: &ExtensionRegistry,
     ) -> Result<Hugr, Box<dyn Error>> {
         let bool_extension = registry
@@ -198,7 +198,7 @@ pub(crate) mod test_helpers {
         build_bool_hugr(&registry)
     }
 
-    pub(crate) fn identity_graph() -> Result<Hugr, Box<dyn Error>> {
+    pub(super) fn identity_graph() -> Result<Hugr, Box<dyn Error>> {
         let builder = DFGBuilder::new(Signature::new_endo([bool_t()]))?;
         let inputs = builder.input_wires();
         Ok(builder.finish_hugr_with_outputs(inputs)?)
