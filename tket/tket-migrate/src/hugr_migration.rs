@@ -6,7 +6,7 @@ use crate::{
     update_maps::{OpMapping, TypeMapping},
 };
 use hugr::Hugr;
-use hugr::{HugrView, hugr::hugrmut::HugrMut};
+use hugr::HugrView;
 use tket::passes::{ComposablePass, ReplaceTypes};
 
 /// Applies lists of operation and type mappings in a single replacement pass.
@@ -33,10 +33,9 @@ fn migrate(
 
     replacer.run(&mut hugr)?;
 
-    // remove unused extensions
-    // NICOLA: TODO:
-    let registry = hugr.extensions().clone(); // &*LOCAL_REGISTRY
-    hugr.resolve_extension_defs(&registry).unwrap();
+    // Finally, we add any missing extensions and remove unused ones
+    let registry = &*LOCAL_REGISTRY;
+    hugr.resolve_extension_defs(registry).unwrap();
 
     hugr.validate()?;
 
@@ -46,10 +45,7 @@ fn migrate(
 /// Migrates legacy TKET measurement and boolean operations using local extensions.
 ///
 /// The HUGR may contain unresolved operations and types and no extension registry.
-pub fn migrate_hugr_default(mut hugr: Hugr) -> Result<Hugr, MigrationError> {
-    // Ensure that the hugr has all the extensions
-    // NICOLA: TODO: add only the one we need
-    hugr.use_extensions(&*LOCAL_REGISTRY);
+pub fn migrate_hugr_default(hugr: Hugr) -> Result<Hugr, MigrationError> {
     migrate(
         hugr,
         &[
