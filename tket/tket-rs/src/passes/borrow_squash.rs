@@ -255,6 +255,24 @@ fn borrow_squash_traversal<H: HugrMut<Node = Node>>(
             .single_linked_input(n, ports.out)
             .expect("array is linear");
         hugr.connect(in_array.0, in_array.1, out_array.0, out_array.1);
+        // Now elide the order edges by connecting every predecessor to every successor
+        // (expensive if there are many, but for typical borrow/return we usually expect only one).
+        let opty = hugr.get_optype(n);
+        let inport = opty.other_input_port().unwrap();
+        let outport = opty.other_output_port().unwrap();
+        let order_succs = hugr.linked_inputs(n, outport).collect::<Vec<_>>();
+        let order_preds = hugr.linked_outputs(n, inport).collect::<Vec<_>>();
+        for (pred, order_outport) in order_preds {
+            let already_succs = hugr
+                .linked_inputs(pred, order_outport)
+                .collect::<HashSet<_>>();
+            for (succ, _) in order_succs
+                .iter()
+                .filter(|succ| !already_succs.contains(succ))
+            {
+                hugr.add_other_edge(pred, *succ);
+            }
+        }
         hugr.remove_node(n);
     }
     let mut elided: Vec<_> = rb_elisions
@@ -373,19 +391,20 @@ mod test {
     use hugr::extension::prelude::{ConstUsize, qb_t, usize_t};
     use hugr::extension::simple_op::MakeExtensionOp;
     use hugr::hugr::hugrmut::HugrMut;
-    use hugr::ops::{OpTrait, handle::NodeHandle};
+    use hugr::ops::{Call, FuncDecl, OpTrait, handle::NodeHandle};
     use hugr::std_extensions::collections::{
         array::ArrayKind,
         borrow_array::{BArrayOpBuilder, BArrayUnsafeOpDef, BorrowArray},
     };
-    use hugr::types::Signature;
-    use hugr::{Hugr, HugrView};
+    use hugr::{Hugr, HugrView, Node, Wire, types::Signature};
     use itertools::Itertools;
     use rstest::{fixture, rstest};
 
-    #[rstest]
-    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
-    fn simple() {
+    /// Returns a Hugr that borrows a qubit, returns it, borrows again, returns it.
+    /// Also returns an array of wires: the qubit from the first borrow; and the array
+    /// from the subsequent return, borrow, return.
+    #[fixture]
+    fn borrow_return_twice() -> (Hugr, [Wire; 4]) {
         let mut dfb = DFGBuilder::new(endo_sig([BorrowArray::ty(3, qb_t())])).unwrap();
         let [arr] = dfb.input_wires_arr();
         let idx = dfb.add_load_value(ConstUsize::new(1));
@@ -395,8 +414,15 @@ mod test {
         let arr4 = dfb
             .add_borrow_array_return(qb_t(), 3, arr3, idx, q2)
             .unwrap();
-        let mut h = dfb.finish_hugr_with_outputs([arr4]).unwrap();
+        let h = dfb.finish_hugr_with_outputs([arr4]).unwrap();
         h.validate().unwrap();
+        (h, [q, arr2, arr3, arr4])
+    }
+
+    #[rstest]
+    #[cfg_attr(miri, ignore = "bitvec 1.1.1 violates Miri Stacked Borrows checks.")]
+    fn simple(borrow_return_twice: (Hugr, [Wire; 4])) {
+        let (mut h, [q, arr2, arr3, arr4]) = borrow_return_twice;
 
         // Hand-construct expected hugr after elision
         let mut h2 = h.clone();
@@ -581,6 +607,64 @@ mod test {
             );
         }
         assert!(h.output_neighbours(cx1).all(|n| n == cx2));
+    }
+
+    #[rstest]
+    fn order_edges(
+        borrow_return_twice: (Hugr, [Wire; 4]),
+        #[values(false, true)] call_between: bool,
+    ) {
+        let (mut h, [q, arr2, arr3, arr4]) = borrow_return_twice;
+        let sig = Signature::new_endo([]);
+        let func = h.add_node_with_parent(h.module_root(), FuncDecl::new("stateful", sig.clone()));
+        let func_p = h.get_optype(func).static_output_port().unwrap();
+        let call_op = Call::try_new(sig.into(), []).unwrap();
+        let call_port = call_op.called_function_port();
+        let call1 = h.add_node_with_parent(h.entrypoint(), call_op.clone());
+        let call2 = h.add_node_with_parent(h.entrypoint(), call_op);
+        for c in [call1, call2] {
+            h.connect(func, func_p, c, call_port);
+        }
+        let [inp, out] = h.get_io(h.entrypoint()).unwrap();
+        let [a, b] = if call_between {
+            [call2, arr3.node()]
+        } else {
+            [arr3.node(), call2]
+        };
+        let nodes = [inp, q.node(), call1, arr2.node(), a, b, arr4.node(), out];
+        for (src, tgt) in nodes.iter().tuple_windows() {
+            h.add_other_edge(*src, *tgt);
+        }
+
+        h.validate().unwrap();
+
+        fn order_path_from(h: &Hugr, from: Node, to: Node) -> bool {
+            let order_outport = h.get_optype(from).other_output_port().unwrap();
+            // This is pretty inefficient if there are merges but fine for this test
+            for (n, _) in h.linked_inputs(from, order_outport) {
+                if n == to || order_path_from(h, n, to) {
+                    return true;
+                }
+            }
+            false
+        }
+
+        assert!(order_path_from(&h, inp, out));
+        assert!(order_path_from(&h, call1, call2));
+
+        BorrowSquashPass::default().run(&mut h).unwrap();
+        h.validate().unwrap();
+        // Sanity check that squashing has removed correct nodes
+        for n in [q.node(), arr4.node(), call1, call2] {
+            assert!(h.contains_node(n))
+        }
+        for n in [arr2.node(), arr3.node()] {
+            assert!(!h.contains_node(n));
+        }
+        // and now check the order chain is intact (regression test for
+        // https://github.com/Quantinuum/tket2/issues/2154).
+        assert!(order_path_from(&h, inp, out));
+        assert!(order_path_from(&h, call1, call2));
     }
 
     /// Captures (somewhere) dynamic borrow, return or both together
