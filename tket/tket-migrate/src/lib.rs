@@ -1,9 +1,9 @@
-//! Migrate HUGR extension operations and types between versions.
+//! Migrate HUGR extension operations, types, and constants between versions.
 //!
 //! Use [`migrate_hugr_default`] to migrate an existing HUGR, or
 //! [`migrate_bytes_default`] to load and migrate a serialized HUGR.
 //! Both use bundled extension definitions and the default migration rules to
-//! update legacy TKET quantum and boolean operations and the opaque boolean type.
+//! update legacy TKET quantum and boolean operations, the opaque boolean type, and its constants.
 //! The migrated HUGR is validated before being returned.
 
 /// Default mappings for migrating TKET measurement and boolean operations.

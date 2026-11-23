@@ -3,13 +3,13 @@ use std::io;
 use crate::{
     error::MigrationError,
     extension_loading::LOCAL_REGISTRY,
-    update_maps::{OpMapping, TypeMapping},
+    update_maps::{ConstMapping, OpMapping, TypeMapping},
 };
 use hugr::Hugr;
 use hugr::HugrView;
 use tket::passes::{ComposablePass, ReplaceTypes};
 
-/// Applies lists of operation and type mappings in a single replacement pass.
+/// Applies operation, type, and constant mappings in a single replacement pass.
 ///
 /// All type mappings are registered before operation replacements are built.
 /// Later mappings override earlier mappings for the same source.
@@ -17,6 +17,7 @@ fn migrate(
     mut hugr: Hugr,
     op_mappings: &[&OpMapping],
     type_mappings: &[&TypeMapping],
+    const_mappings: &[&ConstMapping],
 ) -> Result<Hugr, MigrationError> {
     let mut replacer = ReplaceTypes::default();
 
@@ -29,6 +30,10 @@ fn migrate(
         let old_op = old_element.get_instantiated_op()?;
         let template = replacement.get_op_replace(&old_op, &replacer)?;
         replacer.set_replace_op(&old_op, template);
+    }
+
+    for (source, converter) in const_mappings.iter().flat_map(|mapping| mapping.iter()) {
+        replacer.replace_consts(source.get_type()?, *converter);
     }
 
     replacer.run(&mut hugr)?;
@@ -55,12 +60,13 @@ pub fn migrate_hugr_default(hugr: Hugr) -> Result<Hugr, MigrationError> {
             &*crate::default_maps::BOOL_OP_MAPPING,
         ],
         &[&*crate::default_maps::BOOL_TYPE_MAPPING],
+        &[&*crate::default_maps::BOOL_CONST_MAPPING],
     )
 }
 
 /// Migrates legacy TKET measurement and boolean operations using local extensions.
 ///
-/// Reads a HUGR from bytes and migrates it.
+/// Reads a HUGR from bytes and migrates it using local extensions and applies [`migrate_hugr_default`].
 pub fn migrate_bytes_default(bytes: impl io::BufRead) -> Result<Hugr, MigrationError> {
     let hugr = Hugr::load(bytes, Some(&LOCAL_REGISTRY))?;
     migrate_hugr_default(hugr)
@@ -76,7 +82,7 @@ pub(crate) mod test_helpers {
         extension::{
             ExtensionRegistry, Version, prelude::bool_t, resolution::WeakExtensionRegistry,
         },
-        ops::constant::CustomSerialized,
+        ops::constant::{CustomConst, ValueName, downcast_equal_consts},
         std_extensions::{STD_REG, logic::LogicOp},
         types::{Signature, Type},
     };
@@ -84,6 +90,32 @@ pub(crate) mod test_helpers {
 
     const QUANTUM_EXTENSION: &str = "tket.quantum";
     const BOOL_EXTENSION: &str = "tket.bool";
+
+    /// The boolean literal defined by `tket.bool@0.2.0`.
+    /// See the [original implementation](https://github.com/Quantinuum/tket2/blob/b7cda585fd4163af7109e54a36c97a852b693e78/tket/src/extension/bool.rs#L69-L98).
+    #[derive(Clone, Debug, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+    struct ConstBool(bool);
+
+    #[typetag::serde]
+    impl CustomConst for ConstBool {
+        fn name(&self) -> ValueName {
+            format!("ConstBool({})", self.0).into()
+        }
+
+        fn get_type(&self) -> Type {
+            crate::extension_loading::get_extension(BOOL_EXTENSION, &Version::new(0, 2, 0))
+                .unwrap()
+                .get_type("bool")
+                .unwrap()
+                .instantiate([])
+                .unwrap()
+                .into()
+        }
+
+        fn equal_consts(&self, other: &dyn CustomConst) -> bool {
+            downcast_equal_consts(self, other)
+        }
+    }
 
     pub(super) fn load_registry(paths: &[PathBuf]) -> Result<ExtensionRegistry, Box<dyn Error>> {
         let mut registry = STD_REG.to_owned();
@@ -155,10 +187,6 @@ pub(crate) mod test_helpers {
         let or = bool_extension.instantiate_extension_op("or", [])?;
         let xor = bool_extension.instantiate_extension_op("xor", [])?;
         let read = bool_extension.instantiate_extension_op("read", [])?;
-        let legacy_bool = bool_extension
-            .get_type("bool")
-            .ok_or("tket.bool.bool is missing from the extension")?
-            .instantiate([])?;
 
         let mut builder = DFGBuilder::new(Signature::new(vec![bool_t(); 5], [bool_t()]))?;
         let inputs = builder.input_wires();
@@ -180,12 +208,7 @@ pub(crate) mod test_helpers {
         let value = builder
             .add_dataflow_op(xor, [value, values[4]])?
             .out_wire(0);
-        // The current tket crate no longer defines ConstBool, so reproduce the payload
-        // written by its legacy serializer: `c` is the type tag and `v` is the boolean.
-        let truth = builder.add_load_value(CustomSerialized::new(
-            legacy_bool,
-            serde_json::json!({ "c": "ConstBool", "v": true }),
-        ));
+        let truth = builder.add_load_value(ConstBool(true));
         let value = builder.add_dataflow_op(and, [value, truth])?.out_wire(0);
         let output = builder.add_dataflow_op(read, [value])?.out_wire(0);
 
@@ -280,6 +303,7 @@ mod tests {
             hugr,
             &[&OpMapping::new("tket.bool".into(), Version::new(0, 2, 0))],
             &[&TypeMapping::new("tket.bool".into(), Version::new(0, 2, 0))],
+            &[],
         )?;
         new_hugr.validate()?;
         assert_eq!(new_hugr.mermaid_string(), before);
@@ -296,7 +320,7 @@ mod tests {
             "Not",
             OpReplacementTemplate::TemplateInstance(NodeTemplate::linked_hugr(identity_graph()?)),
         );
-        let new_hugr = migrate(hugr, &[&op_mapping], &[])?;
+        let new_hugr = migrate(hugr, &[&op_mapping], &[], &[])?;
         new_hugr.validate()?;
         assert_eq!(new_hugr.mermaid_string(), before);
         Ok(())

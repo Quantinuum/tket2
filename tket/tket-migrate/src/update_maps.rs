@@ -2,16 +2,19 @@ use hugr::types::CustomType;
 use hugr::{
     builder::{DFGBuilder, Dataflow, DataflowHugr},
     extension::Version,
-    ops::{DataflowOpTrait, ExtensionOp},
+    ops::{DataflowOpTrait, ExtensionOp, Value, constant::OpaqueValue},
     types::{Transformable, Type},
 };
 use std::{collections::HashMap, fmt};
-use tket::passes::{ReplaceTypes, replace_types::NodeTemplate};
+use tket::passes::{
+    ReplaceTypes,
+    replace_types::{NodeTemplate, ReplaceTypesError},
+};
 
 use crate::error::{ReplacementError, VersionedElementError};
 use crate::extension_loading::{get_extension, get_op_by_name};
 
-/// Represents an Extension Op by its name, the extension it belongs to, and its version.
+/// Identifies an operation or type by name, extension, and version.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct VersionedElement {
     id: String,
@@ -100,24 +103,35 @@ impl OpReplacementTemplate {
     }
 }
 
-#[derive(Debug)]
-/// Represents a mapping from an old operation to its replacement(s).
-/// It is defined by the version of the operation to replace and the mapping provided.
+/// Maps operation names to their replacements.
+pub(crate) type OpMapping = VersionedMapping<OpReplacementTemplate>;
+
+/// Maps type names to their replacement types.
+pub(crate) type TypeMapping = VersionedMapping<Type>;
+
+/// Maps source type names to converters for constants of those types.
+pub(crate) type ConstMapping = VersionedMapping<ConstConverter>;
+
+/// Converts an opaque value and can use the active pass to migrate its contents.
+type ConstConverter = fn(&OpaqueValue, &ReplaceTypes) -> Result<Value, ReplaceTypesError>;
+
+/// Replacements for named elements of one source extension version.
 ///
 /// # Fields
 ///
-/// - `extension_id`: identifier of the extension that the mapped operations belong to.
-/// - `version`: version of the extension that the mapped (old) operations come from.
-/// - `map`: lookup from a versioned operation (name and version) to the
-///   [`OpReplacementTemplate`] used to replace it.
-pub(crate) struct OpMapping {
+/// - `extension_id` identifies the extension that defines the source operations or types.
+/// - `version` specifies the source version of that extension.
+/// - `map` associates each [`VersionedElement`] with its operation replacement,
+///   replacement type, or constant converter.
+#[derive(Debug)]
+pub(crate) struct VersionedMapping<R> {
     extension_id: String,
     version: Version,
-    map: HashMap<VersionedElement, OpReplacementTemplate>,
+    map: HashMap<VersionedElement, R>,
 }
 
-impl OpMapping {
-    /// Maps operation names from the given extension version to their replacements.
+impl<R> VersionedMapping<R> {
+    /// Creates an empty mapping for the given extension version.
     pub(crate) fn new(extension_id: String, version: Version) -> Self {
         Self {
             extension_id,
@@ -126,61 +140,22 @@ impl OpMapping {
         }
     }
 
-    /// Adds or overwrites the replacement for an operation in this extension version.
-    pub(crate) fn insert(&mut self, name: impl Into<String>, replacement: OpReplacementTemplate) {
+    /// Adds or overwrites the replacement for a named element.
+    pub(crate) fn insert(&mut self, name: impl Into<String>, replacement: R) {
         let source =
             VersionedElement::new(name.into(), self.extension_id.clone(), self.version.clone());
         self.map.insert(source, replacement);
     }
 
     /// Adds multiple replacements at once.
-    pub(crate) fn insert_all(&mut self, entries: Vec<(impl Into<String>, OpReplacementTemplate)>) {
-        for (k, v) in entries {
-            self.insert(k, v);
+    pub(crate) fn insert_all(&mut self, entries: Vec<(impl Into<String>, R)>) {
+        for (name, replacement) in entries {
+            self.insert(name, replacement);
         }
     }
 
-    /// Iterates over source operations and their replacements.
-    pub(crate) fn iter(&self) -> impl Iterator<Item = (&VersionedElement, &OpReplacementTemplate)> {
-        self.map.iter()
-    }
-}
-
-#[derive(Debug)]
-/// Maps type names from one source extension version to their replacement types.
-///
-/// The mapping is described by the following fields:
-/// - `extension_id`: identifier of the source extension.
-/// - `version`: version of the source extension.
-/// - `map`: replacement types keyed by the versioned source type.
-pub(crate) struct TypeMapping {
-    /// Identifier of the source extension.
-    extension_id: String,
-    /// Version of the source extension.
-    version: Version,
-    /// Replacement types keyed by the versioned source type.
-    map: HashMap<VersionedElement, Type>,
-}
-
-impl TypeMapping {
-    /// Creates an empty type mapping for the given extension version.
-    pub(crate) fn new(extension_id: String, version: Version) -> Self {
-        Self {
-            extension_id,
-            version,
-            map: HashMap::new(),
-        }
-    }
-
-    /// Adds or overwrites the replacement for a type in this extension version.
-    pub(crate) fn insert(&mut self, name: impl Into<String>, replacement: Type) {
-        let source =
-            VersionedElement::new(name.into(), self.extension_id.clone(), self.version.clone());
-        self.map.insert(source, replacement);
-    }
-
-    /// Iterates over source types and their replacements.
-    pub(crate) fn iter(&self) -> impl Iterator<Item = (&VersionedElement, &Type)> {
+    /// Iterates over versioned source elements and their replacements.
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (&VersionedElement, &R)> {
         self.map.iter()
     }
 }
