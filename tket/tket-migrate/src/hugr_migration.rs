@@ -21,12 +21,12 @@ fn migrate(
     let mut replacer = ReplaceTypes::default();
 
     for (old_type, new_type) in type_mappings.iter().flat_map(|mapping| mapping.iter()) {
-        let old_type = old_type.get_type(&hugr)?;
+        let old_type = old_type.get_type()?;
         replacer.set_replace_type(old_type, new_type.clone());
     }
 
     for (old_element, replacement) in op_mappings.iter().flat_map(|mapping| mapping.iter()) {
-        let old_op = old_element.get_instantiated_op(&hugr)?;
+        let old_op = old_element.get_instantiated_op()?;
         let template = replacement.get_op_replace(&old_op, &replacer)?;
         replacer.set_replace_op(&old_op, template);
     }
@@ -34,6 +34,7 @@ fn migrate(
     replacer.run(&mut hugr)?;
 
     // remove unused extensions
+    // NICOLA: TODO:
     let registry = hugr.extensions().clone(); // &*LOCAL_REGISTRY
     hugr.resolve_extension_defs(&registry).unwrap();
 

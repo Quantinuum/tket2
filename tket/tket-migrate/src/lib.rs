@@ -15,5 +15,5 @@ mod hugr_migration;
 /// Define versioned operations, types, and their replacements.
 mod update_maps;
 
-pub use error::{MigrationError, ReplacementError, VersionedElementError};
+pub use error::{ExtensionLookupError, MigrationError, ReplacementError, VersionedElementError};
 pub use hugr_migration::{migrate_bytes_default, migrate_hugr_default};

@@ -2,10 +2,46 @@
 
 use std::sync::LazyLock;
 
-use hugr::{Extension, extension::ExtensionRegistry};
+use hugr::{
+    Extension,
+    extension::{ExtensionRegistry, Version},
+    ops::ExtensionOp,
+};
+
+use crate::error::ExtensionLookupError;
 
 /// Registry containing local extensions for migration.
 pub(crate) static LOCAL_REGISTRY: LazyLock<ExtensionRegistry> = LazyLock::new(local_registry);
+
+/// Looks up a bundled extension by name and exact version.
+pub(crate) fn get_extension(
+    name: &str,
+    version: &Version,
+) -> Result<&'static Extension, ExtensionLookupError> {
+    LOCAL_REGISTRY
+        .get_exact(name, version)
+        .map(AsRef::as_ref)
+        .ok_or_else(|| ExtensionLookupError::MissingExtension {
+            name: name.to_owned(),
+            version: version.clone(),
+        })
+}
+
+/// Instantiates a named extension operation that takes no type arguments.
+pub(crate) fn get_op_by_name(
+    name: &str,
+    ext: &Extension,
+) -> Result<ExtensionOp, ExtensionLookupError> {
+    let definition = ext
+        .get_op(name)
+        .ok_or_else(|| ExtensionLookupError::MissingOperation { name: name.into() })?;
+    ExtensionOp::new(definition.clone(), []).map_err(|source| {
+        ExtensionLookupError::InstantiateOperation {
+            name: name.into(),
+            source,
+        }
+    })
+}
 
 /// Builds the extension registry used for migration.
 ///

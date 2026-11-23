@@ -1,4 +1,3 @@
-use hugr::HugrView;
 use hugr::types::CustomType;
 use hugr::{
     builder::{DFGBuilder, Dataflow, DataflowHugr},
@@ -10,12 +9,12 @@ use std::{collections::HashMap, fmt};
 use tket::passes::{ReplaceTypes, replace_types::NodeTemplate};
 
 use crate::error::{ReplacementError, VersionedElementError};
+use crate::extension_loading::{get_extension, get_op_by_name};
 
 /// Represents an Extension Op by its name, the extension it belongs to, and its version.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub(crate) struct VersionedElement {
+pub struct VersionedElement {
     id: String,
-    // todo: use Extension here
     extension_id: String,
     version: Version,
 }
@@ -30,43 +29,26 @@ impl VersionedElement {
         }
     }
 
-    /// Instantiates the extension operation from the given Hugr view.
+    /// Instantiates the extension operation from the local registry.
     ///
     /// Returns an error when the extension or definition is missing or cannot be instantiated.
-    pub(crate) fn get_instantiated_op<T: HugrView>(
-        &self,
-        hugr: &T,
-    ) -> Result<ExtensionOp, VersionedElementError> {
-        // LOCAL REGITRY
-        let Some(extension) = hugr
-            .extensions()
-            .get_exact(&self.extension_id, &self.version)
-        else {
-            return Err(VersionedElementError::MissingExtension(self.clone()));
-        };
-        let definition = extension
-            .get_op(self.id.as_str())
-            .ok_or_else(|| VersionedElementError::MissingOperation(self.clone()))?;
-        let operation = ExtensionOp::new(definition.clone(), []).map_err(|source| {
-            VersionedElementError::InstantiateOperation {
+    pub(crate) fn get_instantiated_op(&self) -> Result<ExtensionOp, VersionedElementError> {
+        get_extension(&self.extension_id, &self.version)
+            .and_then(|extension| get_op_by_name(&self.id, extension))
+            .map_err(|source| VersionedElementError::ExtensionLookup {
+                element: self.clone(),
+                source,
+            })
+    }
+
+    /// Returns an error when the extension or type definition is missing or cannot be instantiated.
+    pub(crate) fn get_type(&self) -> Result<CustomType, VersionedElementError> {
+        let extension = get_extension(&self.extension_id, &self.version).map_err(|source| {
+            VersionedElementError::ExtensionLookup {
                 element: self.clone(),
                 source,
             }
         })?;
-        Ok(operation)
-    }
-
-    /// Returns an error when the extension or type definition is missing or cannot be instantiated.
-    pub(crate) fn get_type<T: HugrView>(
-        &self,
-        hugr: &T,
-    ) -> Result<CustomType, VersionedElementError> {
-        let Some(extension) = hugr
-            .extensions()
-            .get_exact(&self.extension_id, &self.version)
-        else {
-            return Err(VersionedElementError::MissingExtension(self.clone()));
-        };
         let definition = extension
             .get_type(self.id.as_str())
             .ok_or_else(|| VersionedElementError::MissingType(self.clone()))?;
@@ -206,7 +188,7 @@ impl TypeMapping {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hugr_migration::test_helpers::*;
+    use crate::error::ExtensionLookupError;
     use hugr::{
         HugrView,
         extension::{Version, prelude::bool_t},
@@ -220,71 +202,84 @@ mod tests {
         VersionedElement::new(id.into(), "tket.bool".into(), Version::new(0, 2, 0))
     }
 
-    fn missing(id: &str) -> VersionedElement {
-        VersionedElement::new(id.into(), "test.missing".into(), Version::new(1, 0, 0))
-    }
-
     #[test]
     fn instantiate_operation_and_type_from_registered_extension() -> Result<(), Box<dyn Error>> {
-        let hugr = bool_graph()?;
-        let operation = old_bool("not").get_instantiated_op(&hugr)?;
+        let operation = old_bool("not").get_instantiated_op()?;
         assert_eq!(operation.unqualified_id(), "not");
         assert_eq!(operation.extension_version(), Version::new(0, 2, 0));
-        let ty = old_bool("bool").get_type(&hugr)?;
+        let ty = old_bool("bool").get_type()?;
         assert_eq!(ty.name(), "bool");
         Ok(())
     }
 
     #[test]
-    fn missing_extension_or_version_is_an_error() -> Result<(), Box<dyn Error>> {
-        let hugr = bool_graph()?;
-        assert!(matches!(
-            missing("not").get_instantiated_op(&hugr),
-            Err(VersionedElementError::MissingExtension(_))
-        ));
-        assert!(matches!(
-            missing("bool").get_type(&hugr),
-            Err(VersionedElementError::MissingExtension(_))
-        ));
-
-        // The extension exists, but the requested version does not.
-        let mut operation = old_bool("not");
-        operation.version = Version::new(99, 0, 0);
-        assert!(matches!(
-            operation.get_instantiated_op(&hugr),
-            Err(VersionedElementError::MissingExtension(_))
-        ));
-        let mut ty = old_bool("bool");
-        ty.version = Version::new(99, 0, 0);
-        assert!(matches!(
-            ty.get_type(&hugr),
-            Err(VersionedElementError::MissingExtension(_))
-        ));
-        Ok(())
+    fn missing_extension_or_version_is_an_error() {
+        for (name, version) in [
+            ("test.missing", Version::new(1, 0, 0)),
+            ("tket.bool", Version::new(99, 0, 0)),
+        ] {
+            let op = VersionedElement::new("not".into(), name.into(), version.clone());
+            let ty = VersionedElement::new("bool".into(), name.into(), version.clone());
+            for (requested, error) in [
+                (&op, op.get_instantiated_op().unwrap_err()),
+                (&ty, ty.get_type().unwrap_err()),
+            ] {
+                let VersionedElementError::ExtensionLookup {
+                    element,
+                    source:
+                        ExtensionLookupError::MissingExtension {
+                            name: missing_name,
+                            version: missing_version,
+                        },
+                } = error
+                else {
+                    panic!("Expected MissingExtension for {requested}, got {error:?}");
+                };
+                assert_eq!(&element, requested);
+                assert_eq!(missing_name, name);
+                assert_eq!(missing_version, version);
+            }
+        }
     }
 
     #[test]
-    fn missing_definition_in_existing_extension_is_an_error() -> Result<(), Box<dyn Error>> {
-        let hugr = bool_graph()?;
+    fn missing_definition_in_existing_extension_is_an_error() {
         let requested = old_bool("nonexistent");
         assert!(matches!(
-            requested.get_instantiated_op(&hugr),
-            Err(VersionedElementError::MissingOperation(element)) if element == requested
+            requested.get_instantiated_op(),
+            Err(VersionedElementError::ExtensionLookup {
+                element,
+                source: ExtensionLookupError::MissingOperation { name },
+            }) if element == requested && name == requested.id
         ));
         assert!(matches!(
-            requested.get_type(&hugr),
+            requested.get_type(),
             Err(VersionedElementError::MissingType(element)) if element == requested
         ));
-        Ok(())
+    }
+
+    #[test]
+    fn operation_with_required_type_arguments_reports_instantiation_error() {
+        let requested = VersionedElement::new(
+            "symbolic_angle".into(),
+            "tket.quantum".into(),
+            Version::new(0, 2, 1),
+        );
+        assert!(matches!(
+            requested.get_instantiated_op(),
+            Err(VersionedElementError::ExtensionLookup {
+                element,
+                source: ExtensionLookupError::InstantiateOperation { name, .. },
+            }) if element == requested && name == requested.id
+        ));
     }
 
     #[test]
     fn empty_replacements_use_migrated_boolean_signatures() -> Result<(), Box<dyn Error>> {
-        let hugr = bool_graph()?;
         let mut replacer = ReplaceTypes::default();
-        replacer.set_replace_type(old_bool("bool").get_type(&hugr)?, bool_t());
+        replacer.set_replace_type(old_bool("bool").get_type()?, bool_t());
         for name in ["make_opaque", "read"] {
-            let operation = old_bool(name).get_instantiated_op(&hugr)?;
+            let operation = old_bool(name).get_instantiated_op()?;
             let template = OpReplacementTemplate::Empty.get_op_replace(&operation, &replacer)?;
             let NodeTemplate::LinkedHugr(replacement, _) = template else {
                 panic!("Expected a graph replacement for {name}");

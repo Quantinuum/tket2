@@ -1,33 +1,61 @@
 //! Errors produced when resolving mappings and migrating a HUGR.
 
-use hugr::{Node, builder::BuildError, extension::SignatureError, hugr::ValidationError};
+use hugr::{
+    Node,
+    builder::BuildError,
+    extension::{SignatureError, Version},
+    hugr::ValidationError,
+};
 use thiserror::Error;
 use tket::passes::replace_types::ReplaceTypesError;
 
 use crate::update_maps::VersionedElement;
 
-/// An extension is missing or cannot provide the requested operation or type.
+/// An extension lookup or operation instantiation failed.
 #[derive(Debug, Error)]
 #[non_exhaustive]
-pub enum VersionedElementError {
-    /// The required extension version is absent.
-    #[error("Element {0} requires a missing extension")]
-    MissingExtension(VersionedElement),
-    /// The extension exists, but the operation definition is absent.
-    #[error("Operation {0} is missing from its extension")]
-    MissingOperation(VersionedElement),
-    /// The extension exists, but the type definition is absent.
-    #[error("Type {0} is missing from its extension")]
-    MissingType(VersionedElement),
-    /// The operation definition cannot be instantiated.
-    #[error("Could not instantiate operation {element}: {source}")]
+pub enum ExtensionLookupError {
+    /// The registry lacks the requested extension version.
+    #[error("The required extension {name}@{version} is missing from `LOCAL_REGISTRY`")]
+    MissingExtension {
+        /// Requested extension name.
+        name: String,
+        /// Requested extension version.
+        version: Version,
+    },
+    /// The extension has no definition for the requested operation.
+    #[error("Operation {name} is missing from the extension")]
+    MissingOperation {
+        /// Requested operation name.
+        name: String,
+    },
+    /// The operation definition cannot be instantiated without type arguments.
+    #[error("Could not instantiate operation {name}: {source}")]
     InstantiateOperation {
-        /// The operation being instantiated.
-        element: VersionedElement,
+        /// Requested operation name.
+        name: String,
         /// The signature error returned by HUGR.
         #[source]
         source: SignatureError,
     },
+}
+
+/// An extension is missing or cannot provide the requested operation or type.
+#[derive(Debug, Error)]
+#[non_exhaustive]
+pub enum VersionedElementError {
+    /// Looking up the extension or instantiating its operation failed.
+    #[error("We cannot initialize {element}: {source}")]
+    ExtensionLookup {
+        /// The element needing the extension.
+        element: VersionedElement,
+        /// The underlying lookup or instantiation error.
+        #[source]
+        source: ExtensionLookupError,
+    },
+    /// The extension exists, but the type definition is absent.
+    #[error("Type {0} is missing from its extension")]
+    MissingType(VersionedElement),
     /// The type definition cannot be instantiated.
     #[error("Could not instantiate type {element}: {source}")]
     InstantiateType {

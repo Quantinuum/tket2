@@ -1,17 +1,14 @@
 use std::sync::LazyLock;
 
+use hugr::Extension;
 use hugr::builder::{DFGBuilder, Dataflow, DataflowHugr};
+use hugr::extension::Version;
 use hugr::extension::prelude::qb_t;
-use hugr::extension::{Version, simple_op::MakeRegisteredOp};
-use hugr::std_extensions::logic::LogicOp;
 use hugr::types::Signature;
 
-use crate::extension_loading::LOCAL_REGISTRY;
+use crate::extension_loading::{get_extension, get_op_by_name};
 use crate::update_maps::{OpMapping, OpReplacementTemplate, TypeMapping};
-use tket::{
-    TketOp, extension::measurement::MeasurementOp, hugr::extension::prelude::bool_t,
-    passes::replace_types::NodeTemplate,
-};
+use tket::{hugr::extension::prelude::bool_t, passes::replace_types::NodeTemplate};
 
 /// Mapping to replace the legacy TKET boolean type with the built-in HUGR boolean type.
 ///
@@ -27,7 +24,7 @@ pub(crate) static MEAS_OP_MAPPING: LazyLock<OpMapping> = LazyLock::new(get_tket_
 /// Mapping to replace legacy operations from the `tket.bool` extension.
 ///
 /// - `tket.bool@0.2.0` operations `and`, `eq`, `not`, `or`, and `xor` become
-///   the corresponding HUGR [`LogicOp`] operations.
+///   the corresponding operations in `logic@0.1.0`.
 /// - `tket.bool@0.2.0::read` and `tket.bool@0.2.0::make_opaque` become
 ///   passthroughs, connecting their inputs directly to their outputs.
 pub(crate) static BOOL_OP_MAPPING: LazyLock<OpMapping> = LazyLock::new(get_bool_op_map);
@@ -38,43 +35,23 @@ pub(crate) static BOOL_OP_MAPPING: LazyLock<OpMapping> = LazyLock::new(get_bool_
 /// `tket.quantum@0.3.0::MeasureFree` followed by `tket.measurement@0.1.0::Read`.
 fn get_tket_quantum_op_map() -> OpMapping {
     let extension_name = "tket.quantum";
-    let old_version = Version::new(0, 2, 1);
+    let old_quantum_version = Version::new(0, 2, 1);
+    let new_quantum_version = Version::new(0, 3, 0);
 
-    let extension = LOCAL_REGISTRY
-        .get_exact(extension_name, &old_version)
-        .expect("Bundled tket.quantum@0.2.1 extension is missing");
-    let mut mapping = OpMapping::new(extension_name.into(), old_version);
+    let old_quantum_extension = get_extension(extension_name, &old_quantum_version).unwrap();
+    let new_quantum_extension = get_extension(extension_name, &new_quantum_version).unwrap();
+
+    let mut mapping = OpMapping::new(extension_name.into(), old_quantum_version);
     mapping.insert_all(
-        extension
+        old_quantum_extension
             .operations()
             .filter_map(|(name, _definition)| {
                 let replacement = match name.as_str() {
-                    "CRz" => NodeTemplate::SingleOp(TketOp::CRz.into()),
-                    "CX" => NodeTemplate::SingleOp(TketOp::CX.into()),
-                    "CY" => NodeTemplate::SingleOp(TketOp::CY.into()),
-                    "CZ" => NodeTemplate::SingleOp(TketOp::CZ.into()),
-                    "H" => NodeTemplate::SingleOp(TketOp::H.into()),
-                    "Measure" => NodeTemplate::SingleOp(TketOp::Measure.into()),
-                    "MeasureFree" => build_measurement_replacement(),
-                    "QAlloc" => NodeTemplate::SingleOp(TketOp::QAlloc.into()),
-                    "QFree" => NodeTemplate::SingleOp(TketOp::QFree.into()),
-                    "Reset" => NodeTemplate::SingleOp(TketOp::Reset.into()),
-                    "Rx" => NodeTemplate::SingleOp(TketOp::Rx.into()),
-                    "Ry" => NodeTemplate::SingleOp(TketOp::Ry.into()),
-                    "Rz" => NodeTemplate::SingleOp(TketOp::Rz.into()),
-                    "S" => NodeTemplate::SingleOp(TketOp::S.into()),
-                    "Sdg" => NodeTemplate::SingleOp(TketOp::Sdg.into()),
-                    "T" => NodeTemplate::SingleOp(TketOp::T.into()),
-                    "Tdg" => NodeTemplate::SingleOp(TketOp::Tdg.into()),
-                    "Toffoli" => NodeTemplate::SingleOp(TketOp::Toffoli.into()),
-                    "TryQAlloc" => NodeTemplate::SingleOp(TketOp::TryQAlloc.into()),
-                    "V" => NodeTemplate::SingleOp(TketOp::V.into()),
-                    "Vdg" => NodeTemplate::SingleOp(TketOp::Vdg.into()),
-                    "X" => NodeTemplate::SingleOp(TketOp::X.into()),
-                    "Y" => NodeTemplate::SingleOp(TketOp::Y.into()),
-                    "Z" => NodeTemplate::SingleOp(TketOp::Z.into()),
+                    "MeasureFree" => build_measurement_replacement(new_quantum_extension),
                     "symbolic_angle" => return None,
-                    _ => panic!("Unexpected tket.quantum@0.2.1 operation: {name}"),
+                    _ => NodeTemplate::SingleOp(
+                        get_op_by_name(name, new_quantum_extension).unwrap().into(),
+                    ),
                 };
                 Some((
                     name.as_str(),
@@ -89,17 +66,22 @@ fn get_tket_quantum_op_map() -> OpMapping {
 /// Builds the replacement for MeasureFree.
 ///
 /// The replacement is a linked HUGR with MeasureFree followed by Read.
-fn build_measurement_replacement() -> NodeTemplate {
+fn build_measurement_replacement(quantum_extension: &Extension) -> NodeTemplate {
+    let measure_free = get_op_by_name("MeasureFree", quantum_extension).unwrap();
+
+    let meas_extension = get_extension("tket.measurement", &Version::new(0, 1, 0)).unwrap();
+    let read = get_op_by_name("Read", meas_extension).unwrap();
+
     // here
     let mut builder = DFGBuilder::new(Signature::new([qb_t()], [bool_t()])).unwrap();
     let [qubit] = builder.input_wires_arr();
     let measurement = builder
         // same as get_instantiated_op
-        .add_dataflow_op(TketOp::MeasureFree, [qubit])
+        .add_dataflow_op(measure_free, [qubit])
         .unwrap()
         .out_wire(0);
     let result = builder
-        .add_dataflow_op(MeasurementOp::Read, [measurement])
+        .add_dataflow_op(read, [measurement])
         .unwrap()
         .out_wire(0);
     let replacement = builder.finish_hugr_with_outputs([result]).unwrap();
@@ -109,25 +91,27 @@ fn build_measurement_replacement() -> NodeTemplate {
 
 /// Define the operation mapping for the `tket.bool` extension.
 ///
-/// Boolean logic operations become the corresponding HUGR [`LogicOp`] operations,
-/// while `read` and `make_opaque` become passthroughs.
+/// Boolean logic operations become the corresponding HUGR operations in
+/// `logic@0.1.0`, while `read` and `make_opaque` become passthroughs.
 fn get_bool_op_map() -> OpMapping {
-    let mut mapping = OpMapping::new("tket.bool".into(), Version::new(0, 2, 0));
+    let bool_id = "tket.bool";
+    let old_version = Version::new(0, 2, 0);
+    let mut mapping = OpMapping::new(bool_id.into(), old_version);
+    let logic_ext = get_extension("logic", &Version::new(0, 1, 0)).unwrap();
     mapping.insert_all(
         [
-            ("and", LogicOp::And),
-            ("eq", LogicOp::Eq),
-            ("not", LogicOp::Not),
-            ("or", LogicOp::Or),
-            ("xor", LogicOp::Xor),
+            ("and", "And"),
+            ("eq", "Eq"),
+            ("not", "Not"),
+            ("or", "Or"),
+            ("xor", "Xor"),
         ]
         .into_iter()
-        .map(|(name, op)| {
+        .map(|(name, replacement)| {
+            let op = get_op_by_name(replacement, logic_ext).unwrap().into();
             (
                 name,
-                OpReplacementTemplate::TemplateInstance(NodeTemplate::SingleOp(
-                    op.to_extension_op().unwrap().into(),
-                )),
+                OpReplacementTemplate::TemplateInstance(NodeTemplate::SingleOp(op)),
             )
         })
         .collect(),
