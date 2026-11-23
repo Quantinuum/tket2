@@ -13,9 +13,11 @@ workspace = true
 
 [dependencies]
 hugr.workspace = true
+serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 thiserror = { workspace = true }
 tket = { path = "../tket-rs" }
+typetag.workspace = true
 
 [dev-dependencies]
 hugr-core.workspace = true

@@ -3,17 +3,24 @@ use std::sync::LazyLock;
 use hugr::Extension;
 use hugr::builder::{DFGBuilder, Dataflow, DataflowHugr};
 use hugr::extension::Version;
-use hugr::extension::prelude::qb_t;
-use hugr::types::Signature;
+use hugr::extension::prelude::{bool_t, qb_t};
+use hugr::ops::{
+    Value,
+    constant::{ConstTypeError, CustomCheckFailure, CustomConst, ValueName, downcast_equal_consts},
+};
+use hugr::types::{Signature, Type};
 
 use crate::extension_loading::{get_extension, get_op_by_name};
-use crate::update_maps::{OpMapping, OpReplacementTemplate, TypeMapping};
-use tket::{hugr::extension::prelude::bool_t, passes::replace_types::NodeTemplate};
+use crate::update_maps::{ConstMapping, OpMapping, OpReplacementTemplate, TypeMapping};
+use tket::passes::replace_types::NodeTemplate;
 
 /// Mapping to replace the legacy TKET boolean type with the built-in HUGR boolean type.
 ///
 /// Maps `tket.bool@0.2.0::bool` to the type returned by [`bool_t`].
 pub(crate) static BOOL_TYPE_MAPPING: LazyLock<TypeMapping> = LazyLock::new(get_bool_type_map);
+
+/// Converts legacy TKET boolean literals to built-in HUGR boolean values.
+pub(crate) static BOOL_CONST_MAPPING: LazyLock<ConstMapping> = LazyLock::new(get_bool_const_map);
 
 /// Mapping to replace legacy operations from the `tket.quantum` extension.
 ///
@@ -127,5 +134,41 @@ fn get_bool_op_map() -> OpMapping {
 fn get_bool_type_map() -> TypeMapping {
     let mut mapping = TypeMapping::new("tket.bool".into(), Version::new(0, 2, 0));
     mapping.insert("bool", bool_t());
+    mapping
+}
+
+/// The boolean literal defined by `tket.bool@0.2.0`.
+/// See the [original implementation](https://github.com/Quantinuum/tket2/blob/b7cda585fd4163af7109e54a36c97a852b693e78/tket/src/extension/bool.rs#L69-L98).
+#[derive(Clone, Debug, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
+pub(crate) struct ConstBool(pub(crate) bool);
+
+#[typetag::serde]
+impl CustomConst for ConstBool {
+    fn name(&self) -> ValueName {
+        format!("ConstBool({})", self.0).into()
+    }
+
+    fn get_type(&self) -> Type {
+        get_extension("tket.bool", &Version::new(0, 2, 0))
+            .unwrap()
+            .get_type("bool")
+            .unwrap()
+            .instantiate([])
+            .unwrap()
+            .into()
+    }
+
+    fn equal_consts(&self, other: &dyn CustomConst) -> bool {
+        downcast_equal_consts(self, other)
+    }
+}
+
+// NICOLA: TODO: DOCS
+fn get_bool_const_map() -> ConstMapping {
+    let mut mapping = ConstMapping::new("tket.bool".into(), Version::new(0, 2, 0));
+    mapping.insert("bool", |value, _| {
+        let b = value.value().downcast_ref::<ConstBool>().unwrap();
+        Ok(Value::from_bool(b.0))
+    });
     mapping
 }

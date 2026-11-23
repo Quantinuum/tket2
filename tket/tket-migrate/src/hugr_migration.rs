@@ -74,6 +74,7 @@ pub fn migrate_bytes_default(bytes: impl io::BufRead) -> Result<Hugr, MigrationE
 
 #[cfg(test)]
 pub(crate) mod test_helpers {
+    use crate::default_maps::ConstBool;
     use hugr::{
         Extension, Hugr,
         builder::{
@@ -82,7 +83,6 @@ pub(crate) mod test_helpers {
         extension::{
             ExtensionRegistry, Version, prelude::bool_t, resolution::WeakExtensionRegistry,
         },
-        ops::constant::{CustomConst, ValueName, downcast_equal_consts},
         std_extensions::{STD_REG, logic::LogicOp},
         types::{Signature, Type},
     };
@@ -90,32 +90,6 @@ pub(crate) mod test_helpers {
 
     const QUANTUM_EXTENSION: &str = "tket.quantum";
     const BOOL_EXTENSION: &str = "tket.bool";
-
-    /// The boolean literal defined by `tket.bool@0.2.0`.
-    /// See the [original implementation](https://github.com/Quantinuum/tket2/blob/b7cda585fd4163af7109e54a36c97a852b693e78/tket/src/extension/bool.rs#L69-L98).
-    #[derive(Clone, Debug, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
-    struct ConstBool(bool);
-
-    #[typetag::serde]
-    impl CustomConst for ConstBool {
-        fn name(&self) -> ValueName {
-            format!("ConstBool({})", self.0).into()
-        }
-
-        fn get_type(&self) -> Type {
-            crate::extension_loading::get_extension(BOOL_EXTENSION, &Version::new(0, 2, 0))
-                .unwrap()
-                .get_type("bool")
-                .unwrap()
-                .instantiate([])
-                .unwrap()
-                .into()
-        }
-
-        fn equal_consts(&self, other: &dyn CustomConst) -> bool {
-            downcast_equal_consts(self, other)
-        }
-    }
 
     pub(super) fn load_registry(paths: &[PathBuf]) -> Result<ExtensionRegistry, Box<dyn Error>> {
         let mut registry = STD_REG.to_owned();
