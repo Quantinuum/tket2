@@ -37,6 +37,8 @@ fn migrate(
     let registry = &*LOCAL_REGISTRY;
     hugr.resolve_extension_defs(registry).unwrap();
 
+    std::fs::write("ccc.mmd", hugr.mermaid_string()).unwrap();
+
     hugr.validate()?;
 
     Ok(hugr)
@@ -71,7 +73,10 @@ pub(crate) mod test_helpers {
         builder::{
             DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, SubContainer,
         },
-        extension::{ExtensionRegistry, prelude::bool_t, resolution::WeakExtensionRegistry},
+        extension::{
+            ExtensionRegistry, Version, prelude::bool_t, resolution::WeakExtensionRegistry,
+        },
+        ops::constant::CustomSerialized,
         std_extensions::{STD_REG, logic::LogicOp},
         types::{Signature, Type},
     };
@@ -96,6 +101,8 @@ pub(crate) mod test_helpers {
         Ok(registry)
     }
 
+    /// Builds a `tket.quantum@0.2.1` graph that allocates a qubit, applies H, and
+    /// measures it with `MeasureFree`, then reads and negates the `tket.bool@0.2.0` result.
     pub(super) fn build_old_hugr(registry: &ExtensionRegistry) -> Result<Hugr, Box<dyn Error>> {
         let quantum = registry
             .get(QUANTUM_EXTENSION)
@@ -103,6 +110,16 @@ pub(crate) mod test_helpers {
         let bool_extension = registry
             .get(BOOL_EXTENSION)
             .ok_or("tket.bool is missing from the registry")?;
+        assert_eq!(
+            quantum.version(),
+            &Version::new(0, 2, 1),
+            "{QUANTUM_EXTENSION}"
+        );
+        assert_eq!(
+            bool_extension.version(),
+            &Version::new(0, 2, 0),
+            "{BOOL_EXTENSION}"
+        );
         let qalloc = quantum.instantiate_extension_op("QAlloc", [])?;
         let h = quantum.instantiate_extension_op("H", [])?;
         let measure_free = quantum.instantiate_extension_op("MeasureFree", [])?;
@@ -117,10 +134,20 @@ pub(crate) mod test_helpers {
         Ok(builder.finish_hugr_with_outputs([])?)
     }
 
-    pub(super) fn build_bool_hugr(registry: &ExtensionRegistry) -> Result<Hugr, Box<dyn Error>> {
+    /// Builds a dataflow graph that converts five HUGR booleans to `tket.bool@0.2.0`,
+    /// combines them with legacy logic operations and a loaded `ConstBool(true)`,
+    /// and reads the result back as a HUGR boolean.
+    pub(super) fn build_legacy_bool_hugr(
+        registry: &ExtensionRegistry,
+    ) -> Result<Hugr, Box<dyn Error>> {
         let bool_extension = registry
             .get(BOOL_EXTENSION)
             .ok_or("tket.bool is missing from the registry")?;
+        assert_eq!(
+            bool_extension.version(),
+            &Version::new(0, 2, 0),
+            "{BOOL_EXTENSION}"
+        );
         let make_opaque = bool_extension.instantiate_extension_op("make_opaque", [])?;
         let not = bool_extension.instantiate_extension_op("not", [])?;
         let and = bool_extension.instantiate_extension_op("and", [])?;
@@ -128,6 +155,10 @@ pub(crate) mod test_helpers {
         let or = bool_extension.instantiate_extension_op("or", [])?;
         let xor = bool_extension.instantiate_extension_op("xor", [])?;
         let read = bool_extension.instantiate_extension_op("read", [])?;
+        let legacy_bool = bool_extension
+            .get_type("bool")
+            .ok_or("tket.bool.bool is missing from the extension")?
+            .instantiate([])?;
 
         let mut builder = DFGBuilder::new(Signature::new(vec![bool_t(); 5], [bool_t()]))?;
         let inputs = builder.input_wires();
@@ -142,13 +173,20 @@ pub(crate) mod test_helpers {
 
         let value = builder.add_dataflow_op(not, [values[0]])?.out_wire(0);
         let value = builder
-            .add_dataflow_op(and, [value, values[1]])?
+            .add_dataflow_op(and.clone(), [value, values[1]])?
             .out_wire(0);
         let value = builder.add_dataflow_op(eq, [value, values[2]])?.out_wire(0);
         let value = builder.add_dataflow_op(or, [value, values[3]])?.out_wire(0);
         let value = builder
             .add_dataflow_op(xor, [value, values[4]])?
             .out_wire(0);
+        // The current tket crate no longer defines ConstBool, so reproduce the payload
+        // written by its legacy serializer: `c` is the type tag and `v` is the boolean.
+        let truth = builder.add_load_value(CustomSerialized::new(
+            legacy_bool,
+            serde_json::json!({ "c": "ConstBool", "v": true }),
+        ));
+        let value = builder.add_dataflow_op(and, [value, truth])?.out_wire(0);
         let output = builder.add_dataflow_op(read, [value])?.out_wire(0);
 
         Ok(builder.finish_hugr_with_outputs([output])?)
@@ -188,11 +226,12 @@ pub(crate) mod test_helpers {
         Ok(function.finish_hugr_with_outputs([value])?)
     }
 
+    /// Builds the legacy boolean dataflow graph using the bundled `tket.bool@0.2.0` definition.
     pub(crate) fn bool_graph() -> Result<Hugr, Box<dyn Error>> {
         let fixture =
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("extensions/tket/bool-0.2.0.json");
         let registry = load_registry(&[fixture])?;
-        build_bool_hugr(&registry)
+        build_legacy_bool_hugr(&registry)
     }
 
     pub(super) fn identity_graph() -> Result<Hugr, Box<dyn Error>> {
@@ -269,7 +308,10 @@ mod tests {
         let fixture =
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("extensions/tket/bool-0.2.0.json");
         let registry = load_registry(&[fixture])?;
-        for hugr in [build_bool_hugr(&registry)?, build_bool_cfg_hugr(&registry)?] {
+        for hugr in [
+            build_legacy_bool_hugr(&registry)?,
+            build_bool_cfg_hugr(&registry)?,
+        ] {
             hugr.validate()?;
             for migrated in migrate_from_hugr_and_bytes(hugr)? {
                 migrated.validate()?;
