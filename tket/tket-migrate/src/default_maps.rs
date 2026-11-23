@@ -7,7 +7,7 @@ use hugr::std_extensions::logic::LogicOp;
 use hugr::types::Signature;
 
 use crate::extension_loading::LOCAL_REGISTRY;
-use crate::update_maps::{OpMapping, OpReplacementTemplate, TypeMapping, VersionedElement};
+use crate::update_maps::{OpMapping, OpReplacementTemplate, TypeMapping};
 use tket::{
     TketOp, extension::measurement::MeasurementOp, hugr::extension::prelude::bool_t,
     passes::replace_types::NodeTemplate,
@@ -40,59 +40,61 @@ fn get_tket_quantum_op_map() -> OpMapping {
     let extension_name = "tket.quantum";
     let old_version = Version::new(0, 2, 1);
 
-    let mut replecements = Vec::new();
-
     let extension = LOCAL_REGISTRY
         .get_exact(extension_name, &old_version)
         .expect("Bundled tket.quantum@0.2.1 extension is missing");
-    for (name, _definition) in extension.operations() {
-        replecements.push((
-            VersionedElement::new(
-                name.to_string(),
-                extension_name.to_string(),
-                old_version.clone(),
-            ),
-            OpReplacementTemplate::TemplateInstance(match name.as_str() {
-                "CRz" => NodeTemplate::SingleOp(TketOp::CRz.into()),
-                "CX" => NodeTemplate::SingleOp(TketOp::CX.into()),
-                "CY" => NodeTemplate::SingleOp(TketOp::CY.into()),
-                "CZ" => NodeTemplate::SingleOp(TketOp::CZ.into()),
-                "H" => NodeTemplate::SingleOp(TketOp::H.into()),
-                "Measure" => NodeTemplate::SingleOp(TketOp::Measure.into()),
-                "MeasureFree" => build_measurement_replacement(),
-                "QAlloc" => NodeTemplate::SingleOp(TketOp::QAlloc.into()),
-                "QFree" => NodeTemplate::SingleOp(TketOp::QFree.into()),
-                "Reset" => NodeTemplate::SingleOp(TketOp::Reset.into()),
-                "Rx" => NodeTemplate::SingleOp(TketOp::Rx.into()),
-                "Ry" => NodeTemplate::SingleOp(TketOp::Ry.into()),
-                "Rz" => NodeTemplate::SingleOp(TketOp::Rz.into()),
-                "S" => NodeTemplate::SingleOp(TketOp::S.into()),
-                "Sdg" => NodeTemplate::SingleOp(TketOp::Sdg.into()),
-                "T" => NodeTemplate::SingleOp(TketOp::T.into()),
-                "Tdg" => NodeTemplate::SingleOp(TketOp::Tdg.into()),
-                "Toffoli" => NodeTemplate::SingleOp(TketOp::Toffoli.into()),
-                "TryQAlloc" => NodeTemplate::SingleOp(TketOp::TryQAlloc.into()),
-                "V" => NodeTemplate::SingleOp(TketOp::V.into()),
-                "Vdg" => NodeTemplate::SingleOp(TketOp::Vdg.into()),
-                "X" => NodeTemplate::SingleOp(TketOp::X.into()),
-                "Y" => NodeTemplate::SingleOp(TketOp::Y.into()),
-                "Z" => NodeTemplate::SingleOp(TketOp::Z.into()),
-                "symbolic_angle" => continue,
-                _ => panic!("Unexpected tket.quantum@0.2.1 operation: {name}"),
-            }),
-        ));
-    }
-
-    replecements.into()
+    let mut mapping = OpMapping::new(extension_name.into(), old_version);
+    mapping.insert_all(
+        extension
+            .operations()
+            .filter_map(|(name, _definition)| {
+                let replacement = match name.as_str() {
+                    "CRz" => NodeTemplate::SingleOp(TketOp::CRz.into()),
+                    "CX" => NodeTemplate::SingleOp(TketOp::CX.into()),
+                    "CY" => NodeTemplate::SingleOp(TketOp::CY.into()),
+                    "CZ" => NodeTemplate::SingleOp(TketOp::CZ.into()),
+                    "H" => NodeTemplate::SingleOp(TketOp::H.into()),
+                    "Measure" => NodeTemplate::SingleOp(TketOp::Measure.into()),
+                    "MeasureFree" => build_measurement_replacement(),
+                    "QAlloc" => NodeTemplate::SingleOp(TketOp::QAlloc.into()),
+                    "QFree" => NodeTemplate::SingleOp(TketOp::QFree.into()),
+                    "Reset" => NodeTemplate::SingleOp(TketOp::Reset.into()),
+                    "Rx" => NodeTemplate::SingleOp(TketOp::Rx.into()),
+                    "Ry" => NodeTemplate::SingleOp(TketOp::Ry.into()),
+                    "Rz" => NodeTemplate::SingleOp(TketOp::Rz.into()),
+                    "S" => NodeTemplate::SingleOp(TketOp::S.into()),
+                    "Sdg" => NodeTemplate::SingleOp(TketOp::Sdg.into()),
+                    "T" => NodeTemplate::SingleOp(TketOp::T.into()),
+                    "Tdg" => NodeTemplate::SingleOp(TketOp::Tdg.into()),
+                    "Toffoli" => NodeTemplate::SingleOp(TketOp::Toffoli.into()),
+                    "TryQAlloc" => NodeTemplate::SingleOp(TketOp::TryQAlloc.into()),
+                    "V" => NodeTemplate::SingleOp(TketOp::V.into()),
+                    "Vdg" => NodeTemplate::SingleOp(TketOp::Vdg.into()),
+                    "X" => NodeTemplate::SingleOp(TketOp::X.into()),
+                    "Y" => NodeTemplate::SingleOp(TketOp::Y.into()),
+                    "Z" => NodeTemplate::SingleOp(TketOp::Z.into()),
+                    "symbolic_angle" => return None,
+                    _ => panic!("Unexpected tket.quantum@0.2.1 operation: {name}"),
+                };
+                Some((
+                    name.as_str(),
+                    OpReplacementTemplate::TemplateInstance(replacement),
+                ))
+            })
+            .collect(),
+    );
+    mapping
 }
 
 /// Builds the replacement for MeasureFree.
 ///
 /// The replacement is a linked HUGR with MeasureFree followed by Read.
 fn build_measurement_replacement() -> NodeTemplate {
+    // here
     let mut builder = DFGBuilder::new(Signature::new([qb_t()], [bool_t()])).unwrap();
     let [qubit] = builder.input_wires_arr();
     let measurement = builder
+        // same as get_instantiated_op
         .add_dataflow_op(TketOp::MeasureFree, [qubit])
         .unwrap()
         .out_wire(0);
@@ -110,91 +112,36 @@ fn build_measurement_replacement() -> NodeTemplate {
 /// Boolean logic operations become the corresponding HUGR [`LogicOp`] operations,
 /// while `read` and `make_opaque` become passthroughs.
 fn get_bool_op_map() -> OpMapping {
-    let extension_name = "tket.bool";
-    let version = Version::new(0, 2, 0);
-
-    vec![
-        (
-            VersionedElement::new(
-                "and".to_string(),
-                extension_name.to_string(),
-                version.clone(),
-            ),
-            OpReplacementTemplate::TemplateInstance(NodeTemplate::SingleOp(
-                LogicOp::And.to_extension_op().unwrap().into(),
-            )),
-        ),
-        (
-            VersionedElement::new(
-                "eq".to_string(),
-                extension_name.to_string(),
-                version.clone(),
-            ),
-            OpReplacementTemplate::TemplateInstance(NodeTemplate::SingleOp(
-                LogicOp::Eq.to_extension_op().unwrap().into(),
-            )),
-        ),
-        (
-            VersionedElement::new(
-                "make_opaque".to_string(),
-                extension_name.to_string(),
-                version.clone(),
-            ),
-            OpReplacementTemplate::Empty,
-        ),
-        (
-            VersionedElement::new(
-                "not".to_string(),
-                extension_name.to_string(),
-                version.clone(),
-            ),
-            OpReplacementTemplate::TemplateInstance(NodeTemplate::SingleOp(
-                LogicOp::Not.to_extension_op().unwrap().into(),
-            )),
-        ),
-        (
-            VersionedElement::new(
-                "or".to_string(),
-                extension_name.to_string(),
-                version.clone(),
-            ),
-            OpReplacementTemplate::TemplateInstance(NodeTemplate::SingleOp(
-                LogicOp::Or.to_extension_op().unwrap().into(),
-            )),
-        ),
-        (
-            VersionedElement::new(
-                "read".to_string(),
-                extension_name.to_string(),
-                version.clone(),
-            ),
-            OpReplacementTemplate::Empty,
-        ),
-        (
-            VersionedElement::new(
-                "xor".to_string(),
-                extension_name.to_string(),
-                version.clone(),
-            ),
-            OpReplacementTemplate::TemplateInstance(NodeTemplate::SingleOp(
-                LogicOp::Xor.to_extension_op().unwrap().into(),
-            )),
-        ),
-    ]
-    .into()
+    let mut mapping = OpMapping::new("tket.bool".into(), Version::new(0, 2, 0));
+    mapping.insert_all(
+        [
+            ("and", LogicOp::And),
+            ("eq", LogicOp::Eq),
+            ("not", LogicOp::Not),
+            ("or", LogicOp::Or),
+            ("xor", LogicOp::Xor),
+        ]
+        .into_iter()
+        .map(|(name, op)| {
+            (
+                name,
+                OpReplacementTemplate::TemplateInstance(NodeTemplate::SingleOp(
+                    op.to_extension_op().unwrap().into(),
+                )),
+            )
+        })
+        .collect(),
+    );
+    mapping.insert("make_opaque", OpReplacementTemplate::Empty);
+    mapping.insert("read", OpReplacementTemplate::Empty);
+    mapping
 }
 
 /// Define the mapping to replace the legacy TKET boolean type with the built-in HUGR boolean type.
 ///
 /// Maps `tket.bool@0.2.0::bool` to the type returned by [`bool_t`].
 fn get_bool_type_map() -> TypeMapping {
-    vec![(
-        VersionedElement::new(
-            "bool".to_string(),
-            "tket.bool".to_string(),
-            Version::new(0, 2, 0),
-        ),
-        bool_t(),
-    )]
-    .into()
+    let mut mapping = TypeMapping::new("tket.bool".into(), Version::new(0, 2, 0));
+    mapping.insert("bool", bool_t());
+    mapping
 }

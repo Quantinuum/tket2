@@ -7,6 +7,16 @@ use hugr::{Extension, extension::ExtensionRegistry};
 /// Registry containing local extensions for migration.
 pub static LOCAL_REGISTRY: LazyLock<ExtensionRegistry> = LazyLock::new(local_registry);
 
+/// Builds the extension registry used for migration.
+///
+/// The registry starts from the standard HUGR extensions and is extended with
+/// the legacy extension definitions bundled in the `extensions` directory.
+/// The bundled definitions are resolved against the standard registry.
+///
+/// # Panics
+///
+/// Panics if a bundled extension is not valid JSON, or if the bundled
+/// extensions cannot be resolved.
 fn local_registry() -> ExtensionRegistry {
     let legacy_extensions = [
         include_str!("../extensions/TKET1-0.2.0.json"),

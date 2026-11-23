@@ -34,7 +34,7 @@ fn migrate(
     replacer.run(&mut hugr)?;
 
     // remove unused extensions
-    let registry = hugr.extensions().clone();
+    let registry = hugr.extensions().clone(); // &*LOCAL_REGISTRY
     hugr.resolve_extension_defs(&registry).unwrap();
 
     hugr.validate()?;
@@ -47,6 +47,7 @@ fn migrate(
 /// The HUGR may contain unresolved operations and types and no extension registry.
 pub fn migrate_hugr_default(mut hugr: Hugr) -> Result<Hugr, MigrationError> {
     // Ensure that the hugr has all the extensions
+    // NICOLA: TODO: add only the one we need
     hugr.use_extensions(&*LOCAL_REGISTRY);
     migrate(
         hugr,
@@ -207,7 +208,7 @@ pub(crate) mod test_helpers {
 #[cfg(test)]
 mod tests {
     use super::{migrate, migrate_bytes_default, migrate_hugr_default, test_helpers::*};
-    use crate::update_maps::{OpMapping, OpReplacementTemplate, TypeMapping, VersionedElement};
+    use crate::update_maps::{OpMapping, OpReplacementTemplate, TypeMapping};
     use hugr::{
         Hugr, HugrView,
         builder::{DFGBuilder, Dataflow, DataflowHugr},
@@ -217,7 +218,7 @@ mod tests {
         ops::{DataflowOpTrait, OpTrait},
         package::Package,
     };
-    use std::{collections::HashMap, error::Error, path::PathBuf};
+    use std::{error::Error, path::PathBuf};
     use tket::passes::replace_types::NodeTemplate;
 
     fn migrate_from_hugr_and_bytes(hugr: Hugr) -> Result<[Hugr; 2], Box<dyn Error>> {
@@ -241,8 +242,8 @@ mod tests {
         let before = hugr.mermaid_string();
         let new_hugr = migrate(
             hugr,
-            &[&OpMapping::new(HashMap::new())],
-            &[&TypeMapping::new(HashMap::new())],
+            &[&OpMapping::new("tket.bool".into(), Version::new(0, 2, 0))],
+            &[&TypeMapping::new("tket.bool".into(), Version::new(0, 2, 0))],
         )?;
         new_hugr.validate()?;
         assert_eq!(new_hugr.mermaid_string(), before);
@@ -254,17 +255,12 @@ mod tests {
         let mut hugr = identity_graph()?;
         hugr.use_extensions([hugr::std_extensions::logic::EXTENSION.clone()]);
         let before = hugr.mermaid_string();
-        let new_hugr = migrate(
-            hugr,
-            &[&vec![(
-                VersionedElement::new("Not".into(), "logic".into(), Version::new(0, 1, 0)),
-                OpReplacementTemplate::TemplateInstance(NodeTemplate::linked_hugr(
-                    identity_graph()?
-                )),
-            )]
-            .into()],
-            &[&TypeMapping::new(HashMap::new())],
-        )?;
+        let mut op_mapping = OpMapping::new("logic".into(), Version::new(0, 1, 0));
+        op_mapping.insert(
+            "Not",
+            OpReplacementTemplate::TemplateInstance(NodeTemplate::linked_hugr(identity_graph()?)),
+        );
+        let new_hugr = migrate(hugr, &[&op_mapping], &[])?;
         new_hugr.validate()?;
         assert_eq!(new_hugr.mermaid_string(), before);
         Ok(())
