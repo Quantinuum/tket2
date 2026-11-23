@@ -178,10 +178,7 @@ After setting up LLVM and the native TKET libraries as described above, run the
 integration tests from the repository root.
 
 ```sh
-uv sync --all-packages --group selene-tests
-uv run --no-sync pytest \
-    tket/qis-compiler/python/tests/test_qsystem_semantics.py \
-    test_files/run_modifier_examples/test_selene.py
+just tket/test-semantics
 ```
 
 The [QIS compiler CI job](.github/workflows/ci.yml) runs pytest over
