@@ -45,27 +45,13 @@ impl VersionedElement {
             })
     }
 
-    pub(crate) fn get_op<'a>(&'a self) -> Result<&'a OpDef, VersionedElementError> {
-        let extension = get_extension(&self.extension_id, &self.version).map_err(|source| {
-            VersionedElementError::ExtensionLookup {
+    pub(crate) fn get_op(&self) -> Result<&OpDef, VersionedElementError> {
+        get_extension(&self.extension_id, &self.version)
+            .and_then(|extension| get_opdef_by_name(&self.id, extension))
+            .map_err(|source| VersionedElementError::ExtensionLookup {
                 element: self.clone(),
                 source,
-            }
-        })?;
-        let def = get_opdef_by_name(&self.id, extension).map_err(|source| {
-            VersionedElementError::ExtensionLookup {
-                element: self.clone(),
-                source,
-            }
-        })?;
-        Ok(def)
-        // Ok(def)
-        // get_extension(&self.extension_id, &self.version)
-        //     .and_then(|extension| get_opdef_by_name(&self.id, extension).cloned())
-        //     .map_err(|source| VersionedElementError::ExtensionLookup {
-        //         element: self.clone(),
-        //         source,
-        //     })
+            })
     }
 
     /// Returns an error when the extension or type definition is missing or cannot be instantiated.

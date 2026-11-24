@@ -52,8 +52,6 @@ fn migrate(
     let registry = &*LOCAL_REGISTRY;
     hugr.resolve_extension_defs(registry).unwrap();
 
-    std::fs::write("ccc.mmd", hugr.mermaid_string()).unwrap();
-
     hugr.validate()?;
 
     Ok(hugr)
@@ -332,6 +330,45 @@ mod tests {
                         .is_none_or(|op| op.extension_id().to_string() != "tket.bool")
                 }));
             }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn migrate_quantum_circuit_with_symbolic_rotation() -> Result<(), Box<dyn Error>> {
+        use hugr::{extension::prelude::qb_t, types::Signature};
+
+        let quantum =
+            crate::extension_loading::get_extension("tket.quantum", &Version::new(0, 2, 1))?;
+        let expression = "theta + pi/4".to_owned();
+        let h = quantum.instantiate_extension_op("H", [])?;
+        let angle =
+            quantum.instantiate_extension_op("symbolic_angle", [expression.clone().into()])?;
+        let rz = quantum.instantiate_extension_op("Rz", [])?;
+
+        let mut builder = DFGBuilder::new(Signature::new_endo([qb_t()]))?;
+        let [qubit] = builder.input_wires_arr();
+        let qubit = builder.add_dataflow_op(h, [qubit])?.out_wire(0);
+        let angle = builder.add_dataflow_op(angle, [])?.out_wire(0);
+        let rotated = builder.add_dataflow_op(rz, [qubit, angle])?.out_wire(0);
+        let hugr = builder.finish_hugr_with_outputs([rotated])?;
+        hugr.validate()?;
+
+        for migrated in migrate_from_hugr_and_bytes(hugr)? {
+            let [input, output] = migrated.get_io(migrated.entrypoint()).unwrap();
+            let (rz, _) = migrated.single_linked_output(output, 0).unwrap();
+            let (h, _) = migrated.single_linked_output(rz, 0).unwrap();
+            let (angle, _) = migrated.single_linked_output(rz, 1).unwrap();
+            assert_eq!(migrated.single_linked_output(h, 0), Some((input, 0.into())));
+
+            for (node, name) in [(h, "H"), (angle, "symbolic_angle"), (rz, "Rz")] {
+                let op = migrated.get_optype(node).as_extension_op().unwrap();
+                assert_eq!(op.extension_id(), quantum.name());
+                assert_eq!(op.extension_version(), Version::new(0, 3, 0));
+                assert_eq!(op.unqualified_id(), name);
+            }
+            let angle = migrated.get_optype(angle).as_extension_op().unwrap();
+            assert_eq!(angle.args(), &[expression.clone().into()]);
         }
         Ok(())
     }

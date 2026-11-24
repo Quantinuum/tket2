@@ -54,7 +54,7 @@ fn get_tket_quantum_op_map() -> OpMapping {
     mapping.insert_all(
         old_quantum_extension
             .operations()
-            .filter_map(|(name, _definition)| {
+            .map(|(name, _definition)| {
                 let replacement = match name.as_str() {
                     "MeasureFree" => build_measurement_replacement(new_quantum_extension),
                     "symbolic_angle" => {
@@ -72,7 +72,7 @@ fn get_tket_quantum_op_map() -> OpMapping {
                         ),
                     )),
                 };
-                Some((name.as_str(), replacement))
+                (name.as_str(), replacement)
             })
             .collect(),
     );
