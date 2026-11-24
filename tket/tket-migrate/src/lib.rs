@@ -6,7 +6,7 @@
 //! update legacy TKET quantum and boolean operations, the opaque boolean type, and its constants.
 //! The migrated HUGR is validated before being returned.
 
-/// Default mappings for migrating TKET measurement and boolean operations.
+/// Default mappings for TKET quantum operations and legacy boolean operations, types, and constants.
 mod default_maps;
 mod error;
 mod extension_loading;

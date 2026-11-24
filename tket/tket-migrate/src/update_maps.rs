@@ -45,6 +45,7 @@ impl VersionedElement {
             })
     }
 
+    /// Looks up the operation definition for this extension version.
     pub(crate) fn get_op(&self) -> Result<&OpDef, VersionedElementError> {
         get_extension(&self.extension_id, &self.version)
             .and_then(|extension| get_opdef_by_name(&self.id, extension))
@@ -88,7 +89,7 @@ type ParametrizedTemplate = Arc<
         + Sync,
 >;
 
-/// A recipe for creating the replacement
+/// Describes how to replace a source operation.
 #[derive(Clone)]
 pub(crate) enum OpReplacementTemplate {
     /// A replacement template for a non-parametrized operation.

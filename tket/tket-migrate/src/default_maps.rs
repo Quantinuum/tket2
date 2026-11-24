@@ -24,10 +24,10 @@ pub(crate) static BOOL_TYPE_MAPPING: LazyLock<TypeMapping> = LazyLock::new(get_b
 /// Converts legacy TKET boolean literals to built-in HUGR boolean values.
 pub(crate) static BOOL_CONST_MAPPING: LazyLock<ConstMapping> = LazyLock::new(get_bool_const_map);
 
-/// Mapping to replace legacy operations from the `tket.quantum` extension.
+/// Maps each `tket.quantum@0.2.1` operation to its namesake in `tket.quantum@0.3.0`.
 ///
-/// - `tket.quantum@0.2.1::MeasureFree` becomes
-///   `tket.quantum@0.3.0::MeasureFree` followed by `tket.measurement@0.1.0::Read`.
+/// `tket.quantum@0.2.1::MeasureFree` is replaced with `tket.quantum@0.3.0::MeasureFree`
+/// followed by `tket.measurement@0.1.0::Read` to produce a HUGR boolean.
 pub(crate) static MEAS_OP_MAPPING: LazyLock<OpMapping> = LazyLock::new(get_tket_quantum_op_map);
 
 /// Mapping to replace legacy operations from the `tket.bool` extension.
@@ -38,10 +38,7 @@ pub(crate) static MEAS_OP_MAPPING: LazyLock<OpMapping> = LazyLock::new(get_tket_
 ///   passthroughs, connecting their inputs directly to their outputs.
 pub(crate) static BOOL_OP_MAPPING: LazyLock<OpMapping> = LazyLock::new(get_bool_op_map);
 
-/// Define the operation mapping for the `tket.quantum` extension.
-///
-/// `tket.quantum@0.2.1::MeasureFree` becomes
-/// `tket.quantum@0.3.0::MeasureFree` followed by `tket.measurement@0.1.0::Read`.
+/// Builds the quantum operation replacements for [`MEAS_OP_MAPPING`].
 fn get_tket_quantum_op_map() -> OpMapping {
     let extension_name = "tket.quantum";
     let old_quantum_version = Version::new(0, 2, 1);
@@ -181,7 +178,7 @@ impl CustomConst for ConstBool {
     }
 }
 
-// NICOLA: TODO: DOCS
+/// Maps legacy [`ConstBool`] literals to HUGR boolean constants with the same value.
 fn get_bool_const_map() -> ConstMapping {
     let mut mapping = ConstMapping::new("tket.bool".into(), Version::new(0, 2, 0));
     mapping.insert("bool", |value, _| {

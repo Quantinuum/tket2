@@ -57,9 +57,10 @@ fn migrate(
     Ok(hugr)
 }
 
-/// Migrates legacy TKET measurement and boolean operations using local extensions.
+/// Upgrades `tket.quantum@0.2.1` operations to `0.3.0` and migrates
+/// `tket.bool@0.2.0` operations, types, and constants to their HUGR equivalents.
 ///
-/// The HUGR may contain unresolved operations and types and no extension registry.
+/// Returns the validated HUGR after resolving extension definitions against the bundled registry.
 pub fn migrate_hugr_default(hugr: Hugr) -> Result<Hugr, MigrationError> {
     migrate(
         hugr,
@@ -72,9 +73,7 @@ pub fn migrate_hugr_default(hugr: Hugr) -> Result<Hugr, MigrationError> {
     )
 }
 
-/// Migrates legacy TKET measurement and boolean operations using local extensions.
-///
-/// Reads a HUGR from bytes and migrates it using local extensions and applies [`migrate_hugr_default`].
+/// Loads a serialized HUGR using the bundled registry and applies [`migrate_hugr_default`].
 pub fn migrate_bytes_default(bytes: impl io::BufRead) -> Result<Hugr, MigrationError> {
     let hugr = Hugr::load(bytes, Some(&LOCAL_REGISTRY))?;
     migrate_hugr_default(hugr)
@@ -334,6 +333,8 @@ mod tests {
         Ok(())
     }
 
+    /// Checks that migration preserves the wiring and angle expression of an `H`–`Rz` circuit
+    /// for both in-memory and serialized HUGRs.
     #[test]
     fn migrate_quantum_circuit_with_symbolic_rotation() -> Result<(), Box<dyn Error>> {
         use hugr::{extension::prelude::qb_t, types::Signature};
