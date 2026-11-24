@@ -3,16 +3,22 @@
 
 ## [0.23.1](https://github.com/Quantinuum/tket2/compare/tket-v0.23.0...tket-v0.23.1) - 2026-11-24
 
+This release adds support for the `power` modifier, improves global phase handling
+during modifier resolution and LLVM lowering, and fixes a panic in tuple
+normalization.
+
 ### Bug Fixes
 
-- Handle order edges of global phase ops in modifier pass ([#2171](https://github.com/Quantinuum/tket2/pull/2171))
-- preserve Order edges (reachability) in BorrowSquashPass ([#2155](https://github.com/Quantinuum/tket2/pull/2155))
+- Preserve order edges on `GlobalPhase` operations during modifier resolution ([#2171](https://github.com/Quantinuum/tket2/pull/2171))
+- Preserve order dependencies when `BorrowSquashPass` removes redundant borrow and return operations ([#2155](https://github.com/Quantinuum/tket2/pull/2155))
+- Update `hugr` to 0.31.1 to fix deserialization of constant definitions ([#2182](https://github.com/Quantinuum/tket2/pull/2182))
+- Update `portgraph` to 0.16.4 to fix an `UntuplePass` panic when a tuple feeds both a used and an unused `UnpackTuple` ([#2183](https://github.com/Quantinuum/tket2/pull/2183))
 
 ### New Features
 
-- Propagate modifiers into classical containers with global phase ([#2162](https://github.com/Quantinuum/tket2/pull/2162))
-- Add no-op emitter for global phase ops ([#2175](https://github.com/Quantinuum/tket2/pull/2175))
-- Implement `power` modifier ([#2103](https://github.com/Quantinuum/tket2/pull/2103))
+- Add support for `power` modifiers ([#2103](https://github.com/Quantinuum/tket2/pull/2103))
+- Propagate modifiers into classical containers that contain global phase operations ([#2162](https://github.com/Quantinuum/tket2/pull/2162))
+- Add `GlobalPhaseCodegenExtension` to lower global phase operations to no-ops in LLVM ([#2175](https://github.com/Quantinuum/tket2/pull/2175))
 
 ## [0.23.0](https://github.com/Quantinuum/tket2/compare/tket-v0.22.1...tket-v0.23.0) - 2026-11-12
 
