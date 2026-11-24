@@ -1,6 +1,16 @@
 # Changelog
 
 
+## [0.30.1](https://github.com/Quantinuum/tket2/compare/tket-qsystem-v0.30.0...tket-qsystem-v0.30.1) - 2026-11-24
+
+### Bug Fixes
+
+- Update `hugr` to 0.31.1 to fix deserialization of constant definitions ([#2182](https://github.com/Quantinuum/tket2/pull/2182))
+
+### Testing
+
+- Move the Guppy optimization tests to Python so they exercise the same pytket pass flow as Guppy ([#2144](https://github.com/Quantinuum/tket2/pull/2144))
+
 ## [0.30.0](https://github.com/Quantinuum/tket2/compare/tket-qsystem-v0.29.1...tket-qsystem-v0.30.0) - 2026-11-12
 
 This release fixes a memory leak when recording array results and updates to HUGR
