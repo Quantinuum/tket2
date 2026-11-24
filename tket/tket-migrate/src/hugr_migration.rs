@@ -31,8 +31,7 @@ fn migrate(
         match replacement_template {
             OpReplacementTemplate::Simple(replacement) => {
                 let old_op = old_element.get_instantiated_op()?;
-                let template = replacement.get_replace(&old_op, &replacer)?;
-                replacer.set_replace_op(&old_op, template);
+                replacer.set_replace_op(&old_op, replacement.get_replace(&old_op, &replacer)?);
             }
             OpReplacementTemplate::Parametrized(par_replacement) => {
                 replacer.set_replace_parametrized_op(old_element.get_op()?, *par_replacement);
