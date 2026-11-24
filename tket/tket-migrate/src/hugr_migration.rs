@@ -1,60 +1,84 @@
 use std::io;
 
 use crate::{
+    default_maps::DEFAULT_MIGRATION,
     error::MigrationError,
     extension_loading::LOCAL_REGISTRY,
-    update_maps::{ConstMapping, OpMapping, OpReplacementTemplate, TypeMapping},
+    update_maps::{ConstMapping, OpMapping, OpReplacementTemplate, TypeMapping, VersionedMapping},
 };
-use hugr::Hugr;
-use hugr::HugrView;
+use hugr::{Hugr, HugrView};
 use tket::passes::{ComposablePass, ReplaceTypes};
 
-/// Applies operation, type, and constant mappings in a single replacement pass.
-///
-/// All type mappings are registered before operation replacements are built.
-/// Later mappings override earlier mappings for the same source.
-fn migrate(
-    mut hugr: Hugr,
-    op_mappings: &[&OpMapping],
-    type_mappings: &[&TypeMapping],
-    const_mappings: &[&ConstMapping],
-) -> Result<Hugr, MigrationError> {
-    let mut replacer = ReplaceTypes::new_with_op_version_matching(true);
+/// Ordered groups of operation, type, and constant mappings.
+pub(crate) struct Migration {
+    op_mappings: Vec<OpMapping>,
+    type_mappings: Vec<TypeMapping>,
+    const_mappings: Vec<ConstMapping>,
+}
 
-    for (old_type, new_type) in type_mappings.iter().flat_map(|mapping| mapping.iter()) {
-        let old_type = old_type.get_type()?;
-        replacer.set_replace_type(old_type, new_type.clone());
-    }
-
-    for (old_element, replacement_template) in op_mappings.iter().flat_map(|mapping| mapping.iter())
-    {
-        match replacement_template {
-            OpReplacementTemplate::Simple(replacement) => {
-                let old_op = old_element.get_instantiated_op()?;
-                replacer.set_replace_op(&old_op, replacement.get_replace(&old_op, &replacer)?);
-            }
-            OpReplacementTemplate::Parametrized(par_replacement) => {
-                let replacement = par_replacement.clone();
-                replacer.set_replace_parametrized_op(old_element.get_op()?, move |args, rt| {
-                    replacement(args, rt)
-                });
-            }
+impl Migration {
+    /// Creates an empty migration.
+    pub(crate) fn new() -> Self {
+        Self {
+            op_mappings: Vec::new(),
+            type_mappings: Vec::new(),
+            const_mappings: Vec::new(),
         }
     }
 
-    for (source, converter) in const_mappings.iter().flat_map(|mapping| mapping.iter()) {
-        replacer.replace_consts(source.get_type()?, *converter);
+    /// Adds operation replacements for one source extension version.
+    pub(crate) fn add_op_mapping(&mut self, mapping: OpMapping) {
+        self.op_mappings.push(mapping);
     }
 
-    replacer.run(&mut hugr)?;
+    /// Adds type replacements for one source extension version.
+    pub(crate) fn add_type_mapping(&mut self, mapping: TypeMapping) {
+        self.type_mappings.push(mapping);
+    }
 
-    // Finally, we add any missing extensions and remove unused ones
-    let registry = &*LOCAL_REGISTRY;
-    hugr.resolve_extension_defs(registry).unwrap();
+    /// Adds constant converters for one source extension version.
+    pub(crate) fn add_const_mapping(&mut self, mapping: ConstMapping) {
+        self.const_mappings.push(mapping);
+    }
 
-    hugr.validate()?;
+    /// Applies the rules in one pass and returns the validated HUGR.
+    ///
+    /// All type replacements are registered before operation templates are built.
+    fn apply(&self, mut hugr: Hugr) -> Result<Hugr, MigrationError> {
+        let mut replacer = ReplaceTypes::new_with_op_version_matching(true);
 
-    Ok(hugr)
+        for (old_type, new_type) in self.type_mappings.iter().flat_map(VersionedMapping::iter) {
+            let old_type = old_type.get_type()?;
+            replacer.set_replace_type(old_type, new_type.clone());
+        }
+
+        for (old_element, replacement_template) in
+            self.op_mappings.iter().flat_map(VersionedMapping::iter)
+        {
+            match replacement_template {
+                OpReplacementTemplate::Simple(replacement) => {
+                    let old_op = old_element.get_instantiated_op()?;
+                    replacer.set_replace_op(&old_op, replacement.get_replace(&old_op, &replacer)?);
+                }
+                OpReplacementTemplate::Parametrized(par_replacement) => {
+                    let replacement = par_replacement.clone();
+                    replacer.set_replace_parametrized_op(old_element.get_op()?, move |args, rt| {
+                        replacement(args, rt)
+                    });
+                }
+            }
+        }
+
+        for (source, converter) in self.const_mappings.iter().flat_map(VersionedMapping::iter) {
+            replacer.replace_consts(source.get_type()?, *converter);
+        }
+
+        replacer.run(&mut hugr)?;
+        hugr.resolve_extension_defs(&LOCAL_REGISTRY).unwrap();
+        hugr.validate()?;
+
+        Ok(hugr)
+    }
 }
 
 /// Upgrades `tket.quantum@0.2.1` operations to `0.3.0` and migrates
@@ -62,15 +86,7 @@ fn migrate(
 ///
 /// Returns the validated HUGR after resolving extension definitions against the bundled registry.
 pub fn migrate_hugr_default(hugr: Hugr) -> Result<Hugr, MigrationError> {
-    migrate(
-        hugr,
-        &[
-            &*crate::default_maps::MEAS_OP_MAPPING,
-            &*crate::default_maps::BOOL_OP_MAPPING,
-        ],
-        &[&*crate::default_maps::BOOL_TYPE_MAPPING],
-        &[&*crate::default_maps::BOOL_CONST_MAPPING],
-    )
+    DEFAULT_MIGRATION.apply(hugr)
 }
 
 /// Loads a serialized HUGR using the bundled registry and applies [`migrate_hugr_default`].
@@ -247,8 +263,8 @@ pub(crate) mod test_helpers {
 
 #[cfg(test)]
 mod tests {
-    use super::{migrate, migrate_bytes_default, migrate_hugr_default, test_helpers::*};
-    use crate::update_maps::{OpMapping, OpReplacementTemplate, SimpleTemplate, TypeMapping};
+    use super::{Migration, migrate_bytes_default, migrate_hugr_default, test_helpers::*};
+    use crate::update_maps::{OpMapping, OpReplacementTemplate, SimpleTemplate};
     use hugr::{
         Hugr, HugrView,
         builder::{DFGBuilder, Dataflow, DataflowHugr},
@@ -280,14 +296,32 @@ mod tests {
         // Keep real old-extension operations: migration must not change them.
         let hugr = bool_graph()?;
         let before = hugr.mermaid_string();
-        let new_hugr = migrate(
-            hugr,
-            &[&OpMapping::new("tket.bool".into(), Version::new(0, 2, 0))],
-            &[&TypeMapping::new("tket.bool".into(), Version::new(0, 2, 0))],
-            &[],
-        )?;
+        let new_hugr = Migration::new().apply(hugr)?;
         new_hugr.validate()?;
         assert_eq!(new_hugr.mermaid_string(), before);
+        Ok(())
+    }
+
+    #[test]
+    /// Test composition of default and added rules not -> Not -> Empty
+    fn extended_default_migration_can_be_reused() -> Result<(), Box<dyn Error>> {
+        let mut migration = Migration::default();
+        // The default rules turn the legacy `not` into `logic.Not`.
+        let mut ops = OpMapping::new("logic".into(), Version::new(0, 1, 0));
+        ops.insert("Not", OpReplacementTemplate::Simple(SimpleTemplate::Empty));
+        migration.add_op_mapping(ops);
+
+        let graph = bool_graph()?;
+        for hugr in [graph.clone(), graph] {
+            let migrated = migration.apply(hugr)?;
+            let names: Vec<_> = migrated
+                .nodes()
+                .filter_map(|n| migrated.get_optype(n).as_extension_op())
+                .map(|op| op.unqualified_id().to_string())
+                .collect();
+            assert!(names.iter().any(|name| name == "And"));
+            assert!(names.iter().all(|name| name != "Not"));
+        }
         Ok(())
     }
 
@@ -296,14 +330,16 @@ mod tests {
         let mut hugr = identity_graph()?;
         hugr.use_extensions([hugr::std_extensions::logic::EXTENSION.clone()]);
         let before = hugr.mermaid_string();
-        let mut op_mapping = OpMapping::new("logic".into(), Version::new(0, 1, 0));
-        op_mapping.insert(
+        let mut ops = OpMapping::new("logic".into(), Version::new(0, 1, 0));
+        ops.insert(
             "Not",
             OpReplacementTemplate::Simple(SimpleTemplate::TemplateInstance(
                 NodeTemplate::linked_hugr(identity_graph()?),
             )),
         );
-        let new_hugr = migrate(hugr, &[&op_mapping], &[], &[])?;
+        let mut migration = Migration::new();
+        migration.add_op_mapping(ops);
+        let new_hugr = migration.apply(hugr)?;
         new_hugr.validate()?;
         assert_eq!(new_hugr.mermaid_string(), before);
         Ok(())

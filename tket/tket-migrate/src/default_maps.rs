@@ -11,34 +11,31 @@ use hugr::ops::{
 use hugr::types::{Signature, Type};
 
 use crate::extension_loading::{get_extension, get_extension_op_by_name};
+use crate::hugr_migration::Migration;
 use crate::update_maps::{
     ConstMapping, OpMapping, OpReplacementTemplate, SimpleTemplate, TypeMapping,
 };
 use tket::passes::replace_types::NodeTemplate;
 
-/// Mapping to replace the legacy TKET boolean type with the built-in HUGR boolean type.
-///
-/// Maps `tket.bool@0.2.0::bool` to the type returned by [`bool_t`].
-pub(crate) static BOOL_TYPE_MAPPING: LazyLock<TypeMapping> = LazyLock::new(get_bool_type_map);
+/// Bundled TKET quantum and boolean migration rules.
+pub(crate) static DEFAULT_MIGRATION: LazyLock<Migration> = LazyLock::new(Migration::default);
 
-/// Converts legacy TKET boolean literals to built-in HUGR boolean values.
-pub(crate) static BOOL_CONST_MAPPING: LazyLock<ConstMapping> = LazyLock::new(get_bool_const_map);
+impl Default for Migration {
+    fn default() -> Self {
+        let mut migration = Migration::new();
+        migration.add_op_mapping(get_tket_quantum_op_map());
+        migration.add_op_mapping(get_bool_op_map());
+        migration.add_type_mapping(get_bool_type_map());
+        migration.add_const_mapping(get_bool_const_map());
+        migration
+    }
+}
 
 /// Maps each `tket.quantum@0.2.1` operation to its namesake in `tket.quantum@0.3.0`.
 ///
 /// `tket.quantum@0.2.1::MeasureFree` is replaced with `tket.quantum@0.3.0::MeasureFree`
 /// followed by `tket.measurement@0.1.0::Read` to produce a HUGR boolean.
-pub(crate) static MEAS_OP_MAPPING: LazyLock<OpMapping> = LazyLock::new(get_tket_quantum_op_map);
-
-/// Mapping to replace legacy operations from the `tket.bool` extension.
-///
-/// - `tket.bool@0.2.0` operations `and`, `eq`, `not`, `or`, and `xor` become
-///   the corresponding operations in `logic@0.1.0`.
-/// - `tket.bool@0.2.0::read` and `tket.bool@0.2.0::make_opaque` become
-///   passthroughs, connecting their inputs directly to their outputs.
-pub(crate) static BOOL_OP_MAPPING: LazyLock<OpMapping> = LazyLock::new(get_bool_op_map);
-
-/// Builds the quantum operation replacements for [`MEAS_OP_MAPPING`].
+/// The replacement for `symbolic_angle` preserves the expression argument.
 fn get_tket_quantum_op_map() -> OpMapping {
     let extension_name = "tket.quantum";
     let old_quantum_version = Version::new(0, 2, 1);
@@ -104,10 +101,12 @@ fn build_measurement_replacement(quantum_extension: &Extension) -> OpReplacement
     )))
 }
 
-/// Define the operation mapping for the `tket.bool` extension.
+/// Define the operation mapping for the `tket.bool@0.2.0` extension.
 ///
-/// Boolean logic operations become the corresponding HUGR operations in
-/// `logic@0.1.0`, while `read` and `make_opaque` become passthroughs.
+/// - `tket.bool@0.2.0` operations `and`, `eq`, `not`, `or`, and `xor` become
+///   the corresponding operations in `logic@0.1.0`.
+/// - `tket.bool@0.2.0::read` and `tket.bool@0.2.0::make_opaque` become
+///   passthroughs, connecting their inputs directly to their outputs.
 fn get_bool_op_map() -> OpMapping {
     let bool_id = "tket.bool";
     let old_version = Version::new(0, 2, 0);

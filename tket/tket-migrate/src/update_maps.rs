@@ -6,7 +6,7 @@ use hugr::{
     ops::{DataflowOpTrait, ExtensionOp, Value, constant::OpaqueValue},
     types::{Transformable, Type},
 };
-use std::{collections::HashMap, fmt, sync::Arc};
+use std::{collections::BTreeMap, fmt, sync::Arc};
 use tket::passes::{
     ReplaceTypes,
     replace_types::{NodeTemplate, ReplaceTypesError},
@@ -16,7 +16,7 @@ use crate::error::{ReplacementError, VersionedElementError};
 use crate::extension_loading::{get_extension, get_extension_op_by_name, get_opdef_by_name};
 
 /// Identifies an operation or type by name, extension, and version.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct VersionedElement {
     id: String,
     extension_id: String,
@@ -155,7 +155,7 @@ type ConstConverter = fn(&OpaqueValue, &ReplaceTypes) -> Result<Value, ReplaceTy
 pub(crate) struct VersionedMapping<R> {
     extension_id: String,
     version: Version,
-    map: HashMap<VersionedElement, R>,
+    map: BTreeMap<VersionedElement, R>,
 }
 
 impl<R> VersionedMapping<R> {
@@ -164,7 +164,7 @@ impl<R> VersionedMapping<R> {
         Self {
             extension_id,
             version,
-            map: HashMap::new(),
+            map: BTreeMap::new(),
         }
     }
 
