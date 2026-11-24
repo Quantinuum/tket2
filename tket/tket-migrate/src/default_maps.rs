@@ -6,7 +6,7 @@ use hugr::extension::Version;
 use hugr::extension::prelude::{bool_t, qb_t};
 use hugr::ops::{
     Value,
-    constant::{ConstTypeError, CustomCheckFailure, CustomConst, ValueName, downcast_equal_consts},
+    constant::{CustomConst, ValueName, downcast_equal_consts},
 };
 use hugr::types::{Signature, Type};
 
