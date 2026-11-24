@@ -814,7 +814,7 @@ impl ReplaceTypes {
                     None => {
                         let mut args = ext_op.args().to_vec();
                         changed = args.transform(self)?;
-                        let key = ParametricOp::new(&def, self.match_op_versions);
+                        let key = ParametricOp::new(def, self.match_op_versions);
                         let r2 = match self.param_ops.get(&key) {
                             None => None,
                             Some((rep_fn, opts)) => {
