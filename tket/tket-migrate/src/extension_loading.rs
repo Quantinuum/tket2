@@ -1,10 +1,10 @@
 //! Load local extension definitions for migration.
 
-use std::sync::LazyLock;
+use std::{ops::Deref, sync::LazyLock};
 
 use hugr::{
     Extension,
-    extension::{ExtensionRegistry, Version},
+    extension::{ExtensionRegistry, OpDef, Version},
     ops::ExtensionOp,
 };
 
@@ -27,19 +27,32 @@ pub(crate) fn get_extension(
         })
 }
 
+/// Gets an opdef by name from an extension, returns error if missing.
+pub(crate) fn get_opdef_by_name<'a>(
+    name: &str,
+    ext: &'a Extension,
+) -> Result<&'a OpDef, ExtensionLookupError> {
+    let arc_op = ext
+        .get_op(name)
+        .ok_or_else(|| ExtensionLookupError::MissingOperation { name: name.into() })?;
+
+    Ok(arc_op.deref())
+}
+
 /// Instantiates a named extension operation that takes no type arguments.
-pub(crate) fn get_op_by_name(
+pub(crate) fn get_extension_op_by_name(
     name: &str,
     ext: &Extension,
 ) -> Result<ExtensionOp, ExtensionLookupError> {
-    let definition = ext
-        .get_op(name)
-        .ok_or_else(|| ExtensionLookupError::MissingOperation { name: name.into() })?;
-    ExtensionOp::new(definition.clone(), []).map_err(|source| {
-        ExtensionLookupError::InstantiateOperation {
-            name: name.into(),
-            source,
-        }
+    ExtensionOp::new(
+        ext.get_op(name)
+            .cloned()
+            .ok_or_else(|| ExtensionLookupError::MissingOperation { name: name.into() })?,
+        [],
+    )
+    .map_err(|source| ExtensionLookupError::InstantiateOperation {
+        name: name.into(),
+        source,
     })
 }
 

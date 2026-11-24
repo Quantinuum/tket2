@@ -10,8 +10,10 @@ use hugr::ops::{
 };
 use hugr::types::{Signature, Type};
 
-use crate::extension_loading::{get_extension, get_op_by_name};
-use crate::update_maps::{ConstMapping, OpMapping, OpReplacementTemplate, TypeMapping};
+use crate::extension_loading::{get_extension, get_extension_op_by_name};
+use crate::update_maps::{
+    ConstMapping, OpMapping, OpReplacementTemplate, SimpleTemplate, TypeMapping,
+};
 use tket::passes::replace_types::NodeTemplate;
 
 /// Mapping to replace the legacy TKET boolean type with the built-in HUGR boolean type.
@@ -57,12 +59,14 @@ fn get_tket_quantum_op_map() -> OpMapping {
                     "MeasureFree" => build_measurement_replacement(new_quantum_extension),
                     "symbolic_angle" => return None,
                     _ => NodeTemplate::SingleOp(
-                        get_op_by_name(name, new_quantum_extension).unwrap().into(),
+                        get_extension_op_by_name(name, new_quantum_extension)
+                            .unwrap()
+                            .into(),
                     ),
                 };
                 Some((
                     name.as_str(),
-                    OpReplacementTemplate::TemplateInstance(replacement),
+                    OpReplacementTemplate::Simple(SimpleTemplate::TemplateInstance(replacement)),
                 ))
             })
             .collect(),
@@ -74,10 +78,10 @@ fn get_tket_quantum_op_map() -> OpMapping {
 ///
 /// The replacement is a linked HUGR with MeasureFree followed by Read.
 fn build_measurement_replacement(quantum_extension: &Extension) -> NodeTemplate {
-    let measure_free = get_op_by_name("MeasureFree", quantum_extension).unwrap();
+    let measure_free = get_extension_op_by_name("MeasureFree", quantum_extension).unwrap();
 
     let meas_extension = get_extension("tket.measurement", &Version::new(0, 1, 0)).unwrap();
-    let read = get_op_by_name("Read", meas_extension).unwrap();
+    let read = get_extension_op_by_name("Read", meas_extension).unwrap();
 
     // here
     let mut builder = DFGBuilder::new(Signature::new([qb_t()], [bool_t()])).unwrap();
@@ -115,16 +119,23 @@ fn get_bool_op_map() -> OpMapping {
         ]
         .into_iter()
         .map(|(name, replacement)| {
-            let op = get_op_by_name(replacement, logic_ext).unwrap().into();
+            let op = get_extension_op_by_name(replacement, logic_ext)
+                .unwrap()
+                .into();
             (
                 name,
-                OpReplacementTemplate::TemplateInstance(NodeTemplate::SingleOp(op)),
+                OpReplacementTemplate::Simple(SimpleTemplate::TemplateInstance(
+                    NodeTemplate::SingleOp(op),
+                )),
             )
         })
         .collect(),
     );
-    mapping.insert("make_opaque", OpReplacementTemplate::Empty);
-    mapping.insert("read", OpReplacementTemplate::Empty);
+    mapping.insert(
+        "make_opaque",
+        OpReplacementTemplate::Simple(SimpleTemplate::Empty),
+    );
+    mapping.insert("read", OpReplacementTemplate::Simple(SimpleTemplate::Empty));
     mapping
 }
 

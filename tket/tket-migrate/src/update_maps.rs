@@ -1,4 +1,5 @@
-use hugr::types::CustomType;
+use hugr::extension::OpDef;
+use hugr::types::{CustomType, TypeArg};
 use hugr::{
     builder::{DFGBuilder, Dataflow, DataflowHugr},
     extension::Version,
@@ -12,7 +13,7 @@ use tket::passes::{
 };
 
 use crate::error::{ReplacementError, VersionedElementError};
-use crate::extension_loading::{get_extension, get_op_by_name};
+use crate::extension_loading::{get_extension, get_extension_op_by_name, get_opdef_by_name};
 
 /// Identifies an operation or type by name, extension, and version.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -37,11 +38,34 @@ impl VersionedElement {
     /// Returns an error when the extension or definition is missing or cannot be instantiated.
     pub(crate) fn get_instantiated_op(&self) -> Result<ExtensionOp, VersionedElementError> {
         get_extension(&self.extension_id, &self.version)
-            .and_then(|extension| get_op_by_name(&self.id, extension))
+            .and_then(|extension| get_extension_op_by_name(&self.id, extension))
             .map_err(|source| VersionedElementError::ExtensionLookup {
                 element: self.clone(),
                 source,
             })
+    }
+
+    pub(crate) fn get_op<'a>(&'a self) -> Result<&'a OpDef, VersionedElementError> {
+        let extension = get_extension(&self.extension_id, &self.version).map_err(|source| {
+            VersionedElementError::ExtensionLookup {
+                element: self.clone(),
+                source,
+            }
+        })?;
+        let def = get_opdef_by_name(&self.id, extension).map_err(|source| {
+            VersionedElementError::ExtensionLookup {
+                element: self.clone(),
+                source,
+            }
+        })?;
+        Ok(def)
+        // Ok(def)
+        // get_extension(&self.extension_id, &self.version)
+        //     .and_then(|extension| get_opdef_by_name(&self.id, extension).cloned())
+        //     .map_err(|source| VersionedElementError::ExtensionLookup {
+        //         element: self.clone(),
+        //         source,
+        //     })
     }
 
     /// Returns an error when the extension or type definition is missing or cannot be instantiated.
@@ -71,25 +95,39 @@ impl fmt::Display for VersionedElement {
     }
 }
 
+/// Callback that builds the replacement op given the TypeArgs.
+type ParametrizedTemplate =
+    fn(&[TypeArg], &ReplaceTypes) -> Result<Option<NodeTemplate>, ReplaceTypesError>;
+
 /// A recipe for creating the replacement
 #[derive(Clone, Debug)]
 pub(crate) enum OpReplacementTemplate {
+    /// A replacement template for a non-parametrized operation.
+    Simple(SimpleTemplate),
+    /// A replacement template for a parametrized operation.
+    Parametrized(ParametrizedTemplate),
+}
+
+/// A replacement for a non-parametrized operation.
+#[derive(Clone, Debug)]
+pub(crate) enum SimpleTemplate {
     /// An empty replacement template. States that the target should be removed.
+    // TODO: So far we can remove only non-parametrized ops
     Empty,
     /// The recipe for creating the replacement.
     TemplateInstance(NodeTemplate),
 }
 
-impl OpReplacementTemplate {
-    /// Builds a replacement template.
-    pub(crate) fn get_op_replace(
+impl SimpleTemplate {
+    /// Builds the replacement template.
+    pub(crate) fn get_replace(
         &self,
         old_op: &ExtensionOp,
         replacer: &ReplaceTypes,
     ) -> Result<NodeTemplate, ReplacementError> {
         match self {
-            OpReplacementTemplate::TemplateInstance(template) => Ok(template.clone()),
-            OpReplacementTemplate::Empty => {
+            SimpleTemplate::TemplateInstance(template) => Ok(template.clone()),
+            SimpleTemplate::Empty => {
                 // A passthrough must use the migrated types on both sides.
                 let mut signature = old_op.signature().into_owned();
                 signature.transform(replacer)?;
@@ -255,7 +293,7 @@ mod tests {
         replacer.set_replace_type(old_bool("bool").get_type()?, bool_t());
         for name in ["make_opaque", "read"] {
             let operation = old_bool(name).get_instantiated_op()?;
-            let template = OpReplacementTemplate::Empty.get_op_replace(&operation, &replacer)?;
+            let template = SimpleTemplate::Empty.get_replace(&operation, &replacer)?;
             let NodeTemplate::LinkedHugr(replacement, _) = template else {
                 panic!("Expected a graph replacement for {name}");
             };

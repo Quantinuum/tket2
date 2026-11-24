@@ -3,7 +3,7 @@ use std::io;
 use crate::{
     error::MigrationError,
     extension_loading::LOCAL_REGISTRY,
-    update_maps::{ConstMapping, OpMapping, TypeMapping},
+    update_maps::{ConstMapping, OpMapping, OpReplacementTemplate, TypeMapping},
 };
 use hugr::Hugr;
 use hugr::HugrView;
@@ -26,10 +26,18 @@ fn migrate(
         replacer.set_replace_type(old_type, new_type.clone());
     }
 
-    for (old_element, replacement) in op_mappings.iter().flat_map(|mapping| mapping.iter()) {
-        let old_op = old_element.get_instantiated_op()?;
-        let template = replacement.get_op_replace(&old_op, &replacer)?;
-        replacer.set_replace_op(&old_op, template);
+    for (old_element, replacement_template) in op_mappings.iter().flat_map(|mapping| mapping.iter())
+    {
+        match replacement_template {
+            OpReplacementTemplate::Simple(replacement) => {
+                let old_op = old_element.get_instantiated_op()?;
+                let template = replacement.get_replace(&old_op, &replacer)?;
+                replacer.set_replace_op(&old_op, template);
+            }
+            OpReplacementTemplate::Parametrized(par_replacement) => {
+                replacer.set_replace_parametrized_op(old_element.get_op()?, *par_replacement);
+            }
+        }
     }
 
     for (source, converter) in const_mappings.iter().flat_map(|mapping| mapping.iter()) {
@@ -241,7 +249,7 @@ pub(crate) mod test_helpers {
 #[cfg(test)]
 mod tests {
     use super::{migrate, migrate_bytes_default, migrate_hugr_default, test_helpers::*};
-    use crate::update_maps::{OpMapping, OpReplacementTemplate, TypeMapping};
+    use crate::update_maps::{OpMapping, OpReplacementTemplate, SimpleTemplate, TypeMapping};
     use hugr::{
         Hugr, HugrView,
         builder::{DFGBuilder, Dataflow, DataflowHugr},
@@ -292,7 +300,9 @@ mod tests {
         let mut op_mapping = OpMapping::new("logic".into(), Version::new(0, 1, 0));
         op_mapping.insert(
             "Not",
-            OpReplacementTemplate::TemplateInstance(NodeTemplate::linked_hugr(identity_graph()?)),
+            OpReplacementTemplate::Simple(SimpleTemplate::TemplateInstance(
+                NodeTemplate::linked_hugr(identity_graph()?),
+            )),
         );
         let new_hugr = migrate(hugr, &[&op_mapping], &[], &[])?;
         new_hugr.validate()?;
