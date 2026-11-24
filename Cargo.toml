@@ -70,7 +70,7 @@ large_enum_variant = "allow"
 hugr = "0.31.1"
 hugr-core = "0.31.1"
 hugr-cli = "0.31.1"
-portgraph = "0.16.3"
+portgraph = "0.16.4"
 # There can only be one `pyo3` version in the whole workspace, so we use a
 # loose version constraint to prevent breaking changes in dependent crates where possible.
 pyo3 = ">= 0.28.2, < 0.31"
