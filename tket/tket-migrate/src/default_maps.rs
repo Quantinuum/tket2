@@ -1,4 +1,4 @@
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 
 use hugr::Extension;
 use hugr::builder::{DFGBuilder, Dataflow, DataflowHugr};
@@ -57,17 +57,22 @@ fn get_tket_quantum_op_map() -> OpMapping {
             .filter_map(|(name, _definition)| {
                 let replacement = match name.as_str() {
                     "MeasureFree" => build_measurement_replacement(new_quantum_extension),
-                    "symbolic_angle" => return None,
-                    _ => NodeTemplate::SingleOp(
-                        get_extension_op_by_name(name, new_quantum_extension)
-                            .unwrap()
-                            .into(),
-                    ),
+                    "symbolic_angle" => {
+                        OpReplacementTemplate::Parametrized(Arc::new(move |args, _rt| {
+                            let angle =
+                                new_quantum_extension.instantiate_extension_op(name, args)?;
+                            Ok(Some(NodeTemplate::SingleOp(angle.into())))
+                        }))
+                    }
+                    _ => OpReplacementTemplate::Simple(SimpleTemplate::TemplateInstance(
+                        NodeTemplate::SingleOp(
+                            get_extension_op_by_name(name, new_quantum_extension)
+                                .unwrap()
+                                .into(),
+                        ),
+                    )),
                 };
-                Some((
-                    name.as_str(),
-                    OpReplacementTemplate::Simple(SimpleTemplate::TemplateInstance(replacement)),
-                ))
+                Some((name.as_str(), replacement))
             })
             .collect(),
     );
@@ -77,7 +82,7 @@ fn get_tket_quantum_op_map() -> OpMapping {
 /// Builds the replacement for MeasureFree.
 ///
 /// The replacement is a linked HUGR with MeasureFree followed by Read.
-fn build_measurement_replacement(quantum_extension: &Extension) -> NodeTemplate {
+fn build_measurement_replacement(quantum_extension: &Extension) -> OpReplacementTemplate {
     let measure_free = get_extension_op_by_name("MeasureFree", quantum_extension).unwrap();
 
     let meas_extension = get_extension("tket.measurement", &Version::new(0, 1, 0)).unwrap();
@@ -97,7 +102,9 @@ fn build_measurement_replacement(quantum_extension: &Extension) -> NodeTemplate 
         .out_wire(0);
     let replacement = builder.finish_hugr_with_outputs([result]).unwrap();
 
-    NodeTemplate::linked_hugr(replacement)
+    OpReplacementTemplate::Simple(SimpleTemplate::TemplateInstance(NodeTemplate::linked_hugr(
+        replacement,
+    )))
 }
 
 /// Define the operation mapping for the `tket.bool` extension.

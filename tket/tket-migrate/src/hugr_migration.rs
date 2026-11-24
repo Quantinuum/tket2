@@ -34,7 +34,10 @@ fn migrate(
                 replacer.set_replace_op(&old_op, replacement.get_replace(&old_op, &replacer)?);
             }
             OpReplacementTemplate::Parametrized(par_replacement) => {
-                replacer.set_replace_parametrized_op(old_element.get_op()?, *par_replacement);
+                let replacement = par_replacement.clone();
+                replacer.set_replace_parametrized_op(old_element.get_op()?, move |args, rt| {
+                    replacement(args, rt)
+                });
             }
         }
     }
@@ -346,12 +349,15 @@ mod tests {
             .unwrap();
 
         for (name, _) in quantum.operations() {
-            // MeasureFree has a compound replacement tested separately;
-            // symbolic_angle is not migrated by the default mappings.
-            if matches!(name.as_str(), "MeasureFree" | "symbolic_angle") {
+            // MeasureFree has a compound replacement tested separately.
+            if name.as_str() == "MeasureFree" {
                 continue;
             }
-            let old_op = quantum.instantiate_extension_op(name, [])?;
+            let args = match name.as_str() {
+                "symbolic_angle" => vec!["theta + pi/4".to_owned().into()],
+                _ => vec![],
+            };
+            let old_op = quantum.instantiate_extension_op(name, args.clone())?;
             let signature = old_op.signature().into_owned();
             let mut builder = DFGBuilder::new(signature.clone())?;
             let inputs = builder.input_wires();
@@ -366,7 +372,7 @@ mod tests {
                     .filter_map(|node| migrated.get_optype(node).as_extension_op())
                     .collect::<Vec<_>>();
                 let expected =
-                    tket::extension::TKET_EXTENSION.instantiate_extension_op(name, [])?;
+                    tket::extension::TKET_EXTENSION.instantiate_extension_op(name, args.clone())?;
                 assert_eq!(
                     operations,
                     vec![&expected],

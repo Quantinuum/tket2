@@ -952,11 +952,15 @@ impl From<&CustomType> for ParametricType {
 
 // Separate from above for clarity
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-struct ParametricOp(ExtensionId, String);
+struct ParametricOp(ExtensionId, Version, String);
 
 impl From<&OpDef> for ParametricOp {
     fn from(value: &OpDef) -> Self {
-        Self(value.extension_id().clone(), value.name().to_string())
+        Self(
+            value.extension_id().clone(),
+            value.extension_version(),
+            value.name().to_string(),
+        )
     }
 }
 

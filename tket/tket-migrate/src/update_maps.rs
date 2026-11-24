@@ -6,7 +6,7 @@ use hugr::{
     ops::{DataflowOpTrait, ExtensionOp, Value, constant::OpaqueValue},
     types::{Transformable, Type},
 };
-use std::{collections::HashMap, fmt};
+use std::{collections::HashMap, fmt, sync::Arc};
 use tket::passes::{
     ReplaceTypes,
     replace_types::{NodeTemplate, ReplaceTypesError},
@@ -96,11 +96,14 @@ impl fmt::Display for VersionedElement {
 }
 
 /// Callback that builds the replacement op given the TypeArgs.
-type ParametrizedTemplate =
-    fn(&[TypeArg], &ReplaceTypes) -> Result<Option<NodeTemplate>, ReplaceTypesError>;
+type ParametrizedTemplate = Arc<
+    dyn Fn(&[TypeArg], &ReplaceTypes) -> Result<Option<NodeTemplate>, ReplaceTypesError>
+        + Send
+        + Sync,
+>;
 
 /// A recipe for creating the replacement
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub(crate) enum OpReplacementTemplate {
     /// A replacement template for a non-parametrized operation.
     Simple(SimpleTemplate),
