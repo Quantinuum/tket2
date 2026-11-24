@@ -19,7 +19,7 @@ fn migrate(
     type_mappings: &[&TypeMapping],
     const_mappings: &[&ConstMapping],
 ) -> Result<Hugr, MigrationError> {
-    let mut replacer = ReplaceTypes::default();
+    let mut replacer = ReplaceTypes::new_with_op_version_matching(true);
 
     for (old_type, new_type) in type_mappings.iter().flat_map(|mapping| mapping.iter()) {
         let old_type = old_type.get_type()?;
