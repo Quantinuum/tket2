@@ -1,13 +1,9 @@
-import importlib.util
-import subprocess
-import tempfile
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 from unittest.mock import ANY, patch
 
 import hypothesis.strategies as st
-import numpy as np
 import pytest
 from hugr import ops, tys, val
 from hugr.build.base import Hugr
@@ -330,108 +326,6 @@ def test_modifier_resolver() -> None:
 
     assert _count_ops(resolved, "tket.modifier.ControlModifier") == 0
     assert _count_ops(resolved, "tket.modifier.DaggerModifier") == 0
-
-
-# This test uses downstream selene to execute and verify the result of the modifier resolver pass.
-#
-# That's problematic when updating hugr/tket, as we can only use a selene executor that knows nothing
-# about the changes.
-#
-# TODO: Replace with a local mini-executor test. <https://github.com/Quantinuum/tket2/issues/1648>
-@pytest.mark.skip(reason="Uses downstream dependencies, breaks with tket changes.")
-def test_modifier_execution() -> None:
-    modifier_examples_dir = Path("test_files/modifier_examples")
-    hugr_results_dir = Path("test_files/run_modifier_examples/hugr_results")
-    run_hugrs_dir = Path("test_files/run_modifier_examples")
-    apply_passes_path = run_hugrs_dir / "apply_passes.py"
-    spec = importlib.util.spec_from_file_location(
-        "run_modifier_examples_apply_passes", apply_passes_path
-    )
-    assert spec is not None
-    assert spec.loader is not None
-    apply_passes_module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(apply_passes_module)
-    apply_passes = apply_passes_module.apply_passes
-
-    expected_results = {
-        expected_path.stem: np.load(expected_path).copy()
-        for expected_path in sorted(hugr_results_dir.glob("*.npy"))
-    }
-    for hugr_path in sorted(modifier_examples_dir.glob("*.hugr")):
-        hugr_name = hugr_path.stem
-        expected_statevector = expected_results[f"{hugr_name}_solved"]
-
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            generated_hugrs_dir = Path(tmp_dir) / "modified_hugrs"
-            generated_hugrs_dir.mkdir()
-            apply_passes([hugr_path], generated_hugrs_dir)
-
-            (run_hugrs_dir / "modified_hugrs").mkdir(exist_ok=True)
-            tmp_path = Path(tmp_dir) / f"{hugr_name}.npy"
-            subprocess.run(
-                [
-                    "uv",
-                    "run",
-                    "--no-project",
-                    "--python",
-                    "3.13",
-                    "run_hugrs.py",
-                    str((generated_hugrs_dir / hugr_name).resolve()),
-                    str(tmp_path),
-                ],
-                cwd=run_hugrs_dir,
-                check=True,
-            )
-
-            computed_statevector = np.load(tmp_path)
-            np.testing.assert_allclose(computed_statevector, expected_statevector)
-
-
-def test_panic_in_control() -> None:
-    """Run the solved `panic_in_control` hugr and ensure it aborts on the first panic.
-
-    The example is resolved with `apply_passes` and its solved hugr is executed
-    by `run_panic_in_control.py`, which loads the package, builds an emulator,
-    runs it, and asserts that execution aborts on the first panic and never
-    reaches the second. A non-zero exit status means one of those assertions
-    failed.
-    """
-    hugr_name = "panic_in_control"
-    modifier_examples_dir = Path("test_files/modifier_examples")
-    run_hugrs_dir = Path("test_files/run_modifier_examples")
-    apply_passes_path = run_hugrs_dir / "apply_passes.py"
-    spec = importlib.util.spec_from_file_location(
-        "run_modifier_examples_apply_passes", apply_passes_path
-    )
-    assert spec is not None
-    assert spec.loader is not None
-    apply_passes_module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(apply_passes_module)
-    apply_passes = apply_passes_module.apply_passes
-
-    hugr_path = modifier_examples_dir / f"{hugr_name}.hugr"
-
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        generated_hugrs_dir = Path(tmp_dir) / "modified_hugrs"
-        generated_hugrs_dir.mkdir()
-        apply_passes([hugr_path], generated_hugrs_dir)
-
-        # `run_panic_in_control.py` exits non-zero if the run does not panic as
-        # expected on the first panic.
-        subprocess.run(
-            [
-                "uv",
-                "run",
-                "--no-project",
-                "--prerelease=allow",
-                "--python",
-                "3.13",
-                "run_panic_in_control.py",
-                str((generated_hugrs_dir / hugr_name).resolve()),
-            ],
-            cwd=run_hugrs_dir,
-            check=True,
-        )
 
 
 def test_normalize_guppy_on_modifier() -> None:

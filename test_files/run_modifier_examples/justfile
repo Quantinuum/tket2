@@ -6,7 +6,7 @@ help:
 run-hugrs:
     just apply-passes
     @echo "---- Running hugrs ----"
-    uv run --prerelease=allow --no-project "run_hugrs.py"
+    uv run --all-packages --group selene-tests run_hugrs.py
 
 # Apply the passes to all the hugr files
 apply-passes:
@@ -18,4 +18,4 @@ rh example:
     @echo "---- Applying passes ----"
     uv run apply_passes.py "{{example}}"
     @echo "---- Running hugrs ----"
-    uv run --prerelease=allow --no-project "run_hugrs.py" "{{example}}"
+    uv run --all-packages --group selene-tests run_hugrs.py "{{example}}"

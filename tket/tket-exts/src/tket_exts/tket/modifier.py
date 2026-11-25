@@ -39,5 +39,5 @@ class ModifierExtension(TketExtension):
 
     @functools.cached_property
     def power(self) -> OpDef:
-        """Power modifier operation."""
+        """Power modifier operation, given anunsigned 64-bit integer exponent."""
         return self().get_op("PowerModifier")

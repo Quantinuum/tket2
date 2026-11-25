@@ -1,7 +1,7 @@
 # Modifier examples
 
 This directory contains test guppy programs with modifier
-operations (`dagger` and `control`). The examples are used for regression
+operations (`dagger`, `control`, and `power`). The examples are used for regression
 testing of modifier compilation in tket2.
 
 Each example is defined as a `.py` [uv script](https://docs.astral.sh/uv/guides/scripts/)
@@ -20,6 +20,8 @@ All the previous commands also update
 the `test_files/run_modifier_examples/hugr_results/` directory with `.npy` files
 containing simulation results, and regenerate the human-readable summary in
 `test_files/run_modifier_examples/hugr_results.txt`.
+The simulation uses LLVM bitcode from the local QIS compiler and the Selene
+runtime in the `selene-tests` dependency group.
 
 To recompile and run a single example, run
 `just tket/recompile-modifier <example_name>` from the repository root, or

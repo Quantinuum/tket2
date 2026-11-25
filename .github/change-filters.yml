@@ -41,6 +41,10 @@ qis:
   - *tket-core
   - "tket/tket-qsystem/**"
   - "tket/qis-compiler/**"
+  - "tket/tket-py/**"
+  - "tket/tket-exts/**"
+  - "test_files/modifier_examples/**"
+  - "test_files/run_modifier_examples/**"
   - "pyproject.toml"
   - "uv.lock"
 
