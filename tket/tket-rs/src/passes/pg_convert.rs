@@ -121,9 +121,9 @@ fn cmd_to_op(
         OpType::CRz => {
             let angle_string =
                 params.ok_or(ConversionError::RotationAngleRequired(cmd.op.op_type))?;
-            let angle = angle_string[0]
-                .parse::<f64>()
-                .map_err(|_| ConversionError::SymbolicParameter(angle_string[0].clone()))?;
+            let Ok(angle) = angle_string[0].parse::<f64>() else {
+                return cmd_to_black_box(cmd, qubits);
+            };
 
             Ok(vec![
                 Op::Gate {
@@ -172,9 +172,9 @@ fn cmd_to_op(
         OpType::Rx => {
             let angle_string =
                 params.ok_or(ConversionError::RotationAngleRequired(cmd.op.op_type))?;
-            let angle = angle_string[0]
-                .parse::<f64>()
-                .map_err(|_| ConversionError::SymbolicParameter(angle_string[0].clone()))?;
+            let Ok(angle) = angle_string[0].parse::<f64>() else {
+                return cmd_to_black_box(cmd, qubits);
+            };
 
             Ok(vec![Op::Gate {
                 data: GateData::new(GateType::RX, qubits).with_params(vec![angle]),
@@ -183,9 +183,9 @@ fn cmd_to_op(
         OpType::Ry => {
             let angle_string =
                 params.ok_or(ConversionError::RotationAngleRequired(cmd.op.op_type))?;
-            let angle = angle_string[0]
-                .parse::<f64>()
-                .map_err(|_| ConversionError::SymbolicParameter(angle_string[0].clone()))?;
+            let Ok(angle) = angle_string[0].parse::<f64>() else {
+                return cmd_to_black_box(cmd, qubits);
+            };
 
             Ok(vec![Op::Gate {
                 data: GateData::new(GateType::RY, qubits).with_params(vec![angle]),
@@ -194,9 +194,9 @@ fn cmd_to_op(
         OpType::Rz => {
             let angle_string =
                 params.ok_or(ConversionError::RotationAngleRequired(cmd.op.op_type))?;
-            let angle = angle_string[0]
-                .parse::<f64>()
-                .map_err(|_| ConversionError::SymbolicParameter(angle_string[0].clone()))?;
+            let Ok(angle) = angle_string[0].parse::<f64>() else {
+                return cmd_to_black_box(cmd, qubits);
+            };
 
             Ok(vec![Op::Gate {
                 data: GateData::new(GateType::RZ, qubits).with_params(vec![angle]),
@@ -268,17 +268,22 @@ fn cmd_to_op(
                 qubits.clone()
             };
 
-            let content = serde_json::to_string(&BlackBoxContent {
-                command: cmd.clone(),
-            })
-            .map_err(|e| ConversionError::UnsupportedBlackBox(e.to_string()))?;
-
-            Ok(vec![Op::BlackBox {
-                data: BlackBoxData::new(blackbox_qubits, content),
-            }])
+            cmd_to_black_box(cmd, blackbox_qubits)
         }
         _ => Err(ConversionError::UnsupportedOpType(cmd.op.op_type)),
     }
+}
+
+/// Preserves a command as an opaque black-box operation.
+fn cmd_to_black_box(cmd: &Command<String>, qubits: Vec<usize>) -> Result<Vec<Op>, ConversionError> {
+    let content = serde_json::to_string(&BlackBoxContent {
+        command: cmd.clone(),
+    })
+    .map_err(|e| ConversionError::UnsupportedBlackBox(e.to_string()))?;
+
+    Ok(vec![Op::BlackBox {
+        data: BlackBoxData::new(qubits, content),
+    }])
 }
 
 /// Converts a pauli graph op to an equivalent vector of hugr commands
@@ -634,10 +639,6 @@ fn op_to_cmd(op: &Op, register_map: &RegisterMap) -> Result<Vec<Command<String>>
 /// Errors that can occur when converting between serial circuit and pauli graph
 #[derive(derive_more::Error, Debug, derive_more::Display)]
 pub enum ConversionError {
-    /// Circuit contains symbolic parameter
-    #[display("Error converting to pauli graph: Circuit contains symbolic parameter: {_0}")]
-    #[error(ignore)]
-    SymbolicParameter(String),
     /// Rotation angle is not specified
     #[display("Error converting to pauli graph: {_0} gate requires a rotation angle")]
     #[error(ignore)]
@@ -1096,17 +1097,25 @@ mod tests {
     }
 
     #[rstest]
-    fn error_on_symbolic_rotation_angles(
+    #[case::rx(OpType::Rx, vec![element("left", 2)])]
+    #[case::ry(OpType::Ry, vec![element("left", 2)])]
+    #[case::rz(OpType::Rz, vec![element("left", 2)])]
+    #[case::crz(
+        OpType::CRz,
+        vec![element("left", 2), element("right", 4)]
+    )]
+    fn preserves_symbolic_rotation_angles(
         registers: RegisterMap,
-        #[values(OpType::Rx, OpType::Ry, OpType::Rz, OpType::CRz)] op_type: OpType,
+        #[case] op_type: OpType,
+        #[case] args: Vec<ElementId>,
     ) {
-        let command = rotation(op_type, "theta", vec![element("left", 2)]);
-        let result = cmd_to_op(&command, &registers);
+        let command = rotation(op_type, "theta", args);
+        let ops = cmd_to_op(&command, &registers).unwrap();
 
-        assert!(matches!(
-            result,
-            Err(ConversionError::SymbolicParameter(parameter)) if parameter == "theta"
-        ));
+        assert!(matches!(ops.as_slice(), [Op::BlackBox { .. }]));
+
+        let restored = op_to_cmd(&ops[0], &registers).unwrap();
+        assert_eq!(restored, vec![command]);
     }
 
     #[rstest]
