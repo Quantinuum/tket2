@@ -28,6 +28,7 @@ pub fn optimize(pauli_graph: &PauliGraph, budget: usize, first_bit: usize) -> Pa
             }
             _ => true,
         };
+
         if boundary {
             if !region.get_ops().is_empty() {
                 output.extend(optimize_region(&region, budget, &mut next_bit));
@@ -38,6 +39,7 @@ pub fn optimize(pauli_graph: &PauliGraph, budget: usize, first_bit: usize) -> Pa
             region.add_op(op.clone());
         }
     }
+
     if !region.get_ops().is_empty() {
         output.extend(optimize_region(&region, budget, &mut next_bit));
     }
