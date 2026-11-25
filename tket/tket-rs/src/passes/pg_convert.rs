@@ -992,11 +992,20 @@ mod tests {
             command: command.clone(),
         })
         .unwrap();
+        let black_box_gate = Op::Gate {
+            data: GateData::new(GateType::BlackBox, vec![0]).with_data(content.clone()),
+        };
         let op = Op::BlackBox {
             data: BlackBoxData::new(affected_qubits, content),
         };
 
         assert_eq!(cmd_to_op(&command, &registers).unwrap(), vec![op.clone()]);
+
+        assert_eq!(
+            op_to_cmd(&black_box_gate, &registers).unwrap(),
+            vec![command.clone()]
+        );
+
         assert_eq!(op_to_cmd(&op, &registers).unwrap(), vec![command]);
     }
 
@@ -1151,10 +1160,20 @@ mod tests {
         let op = Op::BlackBox {
             data: BlackBoxData::new(vec![], "not json".to_owned()),
         };
-        let result = op_to_cmd(&op, &registers);
+        let op_result = op_to_cmd(&op, &registers);
+
+        let black_box_gate = Op::Gate {
+            data: GateData::new(GateType::BlackBox, vec![0]).with_data("not json".to_owned()),
+        };
+        let gate_result = op_to_cmd(&black_box_gate, &registers);
 
         assert!(matches!(
-            result,
+            op_result,
+            Err(ConversionError::UnsupportedBlackBox(_))
+        ));
+
+        assert!(matches!(
+            gate_result,
             Err(ConversionError::UnsupportedBlackBox(_))
         ));
     }
