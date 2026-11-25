@@ -1,20 +1,15 @@
-# /// script
-# requires-python = ">=3.13"
-# dependencies = [
-#    "guppylang==1.1.1",
-#    "ziglang==0.16.0",
-# ]
-# ///
-"""Run on selene the passed hugrs"""
+"""Run resolved modifier examples using the local QIS compiler and Selene."""
 
 import shutil
 import sys
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import numpy as np
 import numpy.typing as npt
-from guppylang.emulator import EmulatorBuilder
 from hugr import Hugr
+from selene_runner import run_hugr
+from selene_sim.exceptions import SelenePanicError
 
 
 def format_statevector(
@@ -37,8 +32,6 @@ def format_statevector(
 
 modifier_examples_dir = Path(__file__).resolve().parent / "modified_hugrs"
 result_execution_dir = Path(__file__).resolve().parent / "hugr_results"
-result_execution_dir.mkdir(exist_ok=True)
-
 all_results: list[str] = []
 args = sys.argv[1:]
 if len(args) > 2:
@@ -56,27 +49,23 @@ else:
 result_execution_dir.mkdir(parents=True, exist_ok=True)
 for hugr_path in hugr_paths:
     print(f"Running {hugr_path.name}...")
-    hugr_bytes = hugr_path.read_bytes()
-    hugr = Hugr.from_bytes(hugr_bytes)
-
-    package = hugr.to_package()
-
-    builder = EmulatorBuilder().with_platform("helios")
-    emulator = builder.build(package, n_qubits=9)
-
-    # panic_in_control is expected to panic
-    if "panic_in_control_solved" == hugr_path.stem:
-        try:
-            emulator.statevector_sim().run()
-        except Exception as err:  # noqa: BLE001
-            print(
-                f"\t{hugr_path.stem} panicked as expected: {str(err).splitlines()[0]}"
-            )
-            continue
+    hugr = Hugr.from_bytes(hugr_path.read_bytes())
+    expect_panic = hugr_path.stem == "panic_in_control_solved"
+    try:
+        with TemporaryDirectory() as build_dir:
+            states = run_hugr(hugr, Path(build_dir), n_qubits=1 if expect_panic else 9)
+    except SelenePanicError as err:
+        if not expect_panic:
+            raise
+        message = str(err)
+        if "first panic" not in message or "second panic" in message:
+            raise
+        print(f"\t{hugr_path.stem} panicked as expected: {message.splitlines()[0]}")
+        continue
+    if expect_panic:
         raise SystemExit(f"Expected {hugr_path.stem} to panic, but it completed.")
 
-    state = emulator.statevector_sim().run()
-    res = state.partial_state_dicts()[0]["r"].as_single_state()
+    res = states["r"].get_single_state()
     output_path = (
         Path(args[1])
         if len(args) >= 2
@@ -92,4 +81,5 @@ if len(args) < 2:
     result_path.parent.mkdir(parents=True, exist_ok=True)
     result_path.write_text("\n-----\n".join(all_results) + "\n")
 
-shutil.rmtree(modifier_examples_dir)
+if not args or not Path(args[0]).is_absolute():
+    shutil.rmtree(modifier_examples_dir)

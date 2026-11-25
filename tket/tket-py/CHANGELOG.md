@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.15.16](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.15...tket-py-v0.15.16) (2026-11-24)
+
+### Features
+
+* Resolve `power` modifiers in `Normalize` with an unsigned 64-bit runtime exponent ([#2103](https://github.com/Quantinuum/tket2/pull/2103))
+* Remove redundant tuple pack and unpack operations in either order in `Normalize` ([#2147](https://github.com/Quantinuum/tket2/pull/2147))
+
+### Bug Fixes
+
+* Apply modifiers to global phases inside classical dataflow graphs and conditionals ([#2162](https://github.com/Quantinuum/tket2/pull/2162))
+* Preserve order edges on `GlobalPhase` operations during modifier resolution ([#2171](https://github.com/Quantinuum/tket2/pull/2171))
+* Preserve order dependencies when removing redundant borrows and returns during normalization ([#2155](https://github.com/Quantinuum/tket2/pull/2155))
+* Prevent `Normalize` from panicking after merging control-flow blocks ([#2151](https://github.com/Quantinuum/tket2/pull/2151))
+* Update the native HUGR dependency to 0.31.1 to fix deserialization of constant definitions ([#2182](https://github.com/Quantinuum/tket2/pull/2182))
+* Update Portgraph to 0.16.4 to fix a `Normalize` panic when a tuple feeds both a used and an unused `UnpackTuple` ([#2183](https://github.com/Quantinuum/tket2/pull/2183))
+
+### Performance Improvements
+
+* Speed up constant folding in `Normalize` by avoiding repeated dataflow analysis scans ([#2150](https://github.com/Quantinuum/tket2/pull/2150))
+
 ## [0.15.15](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.14...tket-py-v0.15.15) (2026-11-10)
 
 
