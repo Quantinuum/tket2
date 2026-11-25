@@ -271,9 +271,7 @@ fn cmd_to_op(
             let content = serde_json::to_string(&BlackBoxContent {
                 command: cmd.clone(),
             })
-            .map_err(|e| {
-                ConversionError::UnsupportedBlackBox(e.to_string())
-            })?;
+            .map_err(|e| ConversionError::UnsupportedBlackBox(e.to_string()))?;
 
             Ok(vec![Op::BlackBox {
                 data: BlackBoxData::new(blackbox_qubits, content),
