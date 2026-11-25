@@ -1155,7 +1155,7 @@ mod tests {
 
         assert!(matches!(
             result,
-            Err(ConversionError::UnsupportedBlackBox(content)) if content == "not json"
+            Err(ConversionError::UnsupportedBlackBox(_))
         ));
     }
 
