@@ -62,13 +62,22 @@ impl PGPass for TOptimizationPass {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tk_pg_converter::compare_unitaries_via_tk;
+    use tk_pg_canonical_form::CanonicalFormPass;
     use tk_pg_core::{GateData, GateType, Op, Pauli, RotationData};
     use tk_pg_ir_kernels::PGTableau;
     use tk_pg_qm_tableau::Tableau;
 
-    #[test]
-    fn reduces_t_count_without_ancillas() {
+    // T rotations on all 15 nonzero four-qubit parities give identity up to phase.
+    // Omitting one parity leaves a single inverse T rotation.
+    // The Clifford conjugation preserves commutation and introduces X/Y terms.
+    #[rstest::rstest]
+    #[case::all_parities_cancel_to_identity(15, 0, 0.0)]
+    #[case::missing_parity_leaves_its_inverse(14, 1, -0.25)]
+    fn reduces_t_count_without_ancillas(
+        #[case] input_t_count: usize,
+        #[case] max_t_count: usize,
+        #[case] expected_angle: f64,
+    ) {
         let mut clifford = Tableau::eye(4);
         clifford.postcompose_op(&Op::Gate {
             data: GateData::new(GateType::H, vec![0]),
@@ -95,52 +104,57 @@ mod tests {
             data: GateData::new(GateType::H, vec![1]),
         });
 
-        for (input_t_count, max_t_count) in [(14, 1), (15, 0)] {
-            // T rotations on all 15 nonzero four-qubit parities give identity up to phase.
-            // Omitting one parity leaves a single inverse T rotation.
-            // The Clifford conjugation preserves commutation and introduces X/Y terms.
-            let pg = PauliGraph::new(4).with_ops(
-                (1..=input_t_count)
-                    .flat_map(|parity| {
-                        let string = (0..4)
-                            .map(|q| {
-                                if parity & (1 << q) == 0 {
-                                    Pauli::I
-                                } else {
-                                    Pauli::Z
-                                }
-                            })
-                            .collect();
-                        clifford.conjugate(&Op::Rotation {
-                            data: RotationData::new(string, 0.25),
+        let pg = PauliGraph::new(4).with_ops(
+            (1..=input_t_count)
+                .flat_map(|parity| {
+                    let string = (0..4)
+                        .map(|q| {
+                            if parity & (1 << q) == 0 {
+                                Pauli::I
+                            } else {
+                                Pauli::Z
+                            }
                         })
+                        .collect();
+                    clifford.conjugate(&Op::Rotation {
+                        data: RotationData::new(string, 0.25),
                     })
-                    .collect(),
-            );
-
-            for pauli in [Pauli::X, Pauli::Y] {
-                assert!(pg.get_ops().iter().any(|op| {
-                    matches!(op, Op::Rotation { data } if data.get_string().contains(&pauli))
-                }));
-            }
-
-            let optimized = TOptimizationPass::new().transform(&pg);
-            optimized.try_validate().unwrap();
-            assert_eq!(optimized.get_n_qubits(), pg.get_n_qubits());
-            let rotations: Vec<_> = optimized
-                .get_ops()
-                .iter()
-                .filter_map(|op| match op {
-                    Op::Rotation { data } => Some(data),
-                    _ => None,
                 })
-                .collect();
-            assert!(rotations.iter().all(|data| data.get_angle().abs() == 0.25));
-            assert!(
-                rotations.len() <= max_t_count,
-                "input T count: {input_t_count}"
-            );
-            assert!(compare_unitaries_via_tk(&pg, &optimized));
+                .collect(),
+        );
+
+        for pauli in [Pauli::X, Pauli::Y] {
+            assert!(pg.get_ops().iter().any(|op| {
+                matches!(op, Op::Rotation { data } if data.get_string().contains(&pauli))
+            }));
         }
+
+        let optimized = TOptimizationPass::new().transform(&pg);
+        optimized.try_validate().unwrap();
+
+        assert_eq!(optimized.get_n_qubits(), pg.get_n_qubits());
+
+        let rotations: Vec<_> = optimized
+            .get_ops()
+            .iter()
+            .filter_map(|op| match op {
+                Op::Rotation { data } => Some(data),
+                _ => None,
+            })
+            .collect();
+
+        assert!(rotations.iter().all(|data| data.get_angle().abs() == 0.25));
+        assert!(rotations.len() <= max_t_count);
+
+        let expected = PauliGraph::new(4).with_ops(clifford.conjugate(&Op::Rotation {
+            data: RotationData::new(vec![Pauli::Z; 4], expected_angle),
+        }));
+
+        let canonical = CanonicalFormPass::new();
+
+        assert_eq!(
+            canonical.transform(&optimized),
+            canonical.transform(&expected)
+        );
     }
 }
