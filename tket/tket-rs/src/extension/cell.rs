@@ -280,7 +280,8 @@ pub trait CellOpBuilder: Dataflow {
     fn add_write_cell(&mut self, cell_wire: Wire, val_wire: Wire) -> Result<Wire, BuildError> {
         let ty = self.get_wire_type(val_wire)?;
 
-        let handle = self.add_dataflow_op(CellOpDef::Write.with_type(ty), [cell_wire, val_wire])?;
+        let op = CellOpDef::Write.with_type(ty).to_extension_op()?;
+        let handle = self.add_dataflow_op(op, [cell_wire, val_wire])?;
         Ok(handle.out_wire(0))
     }
 
@@ -483,6 +484,15 @@ pub(crate) mod test {
         let [cell] = builder.input_wires_arr();
         assert!(builder.add_read_cell(cell, qb_t()).is_err());
         builder.finish_hugr_with_outputs([cell]).unwrap();
+    }
+
+    #[test]
+    fn write_rejects_linear_payload() {
+        let sig = Signature::new_endo([cell_type(qb_t()), qb_t()]);
+        let mut builder = DFGBuilder::new(sig).unwrap();
+        let [cell, value] = builder.input_wires_arr();
+        assert!(builder.add_write_cell(cell, value).is_err());
+        builder.finish_hugr_with_outputs([cell, value]).unwrap();
     }
 
     #[test]
