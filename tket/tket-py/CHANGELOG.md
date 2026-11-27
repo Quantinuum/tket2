@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.15.17](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.16...tket-py-v0.15.17) (2026-11-27)
+
+
+### Features
+
+* Add a migration crate ([#2066](https://github.com/Quantinuum/tket2/issues/2066)) ([6e2c2a8](https://github.com/Quantinuum/tket2/commit/6e2c2a8c64fc50f8daa09b6dfce958a728e8e9cf))
+
+
+### Bug Fixes
+
+* added support for SetBits and generalised BarrierContent struct ([#2125](https://github.com/Quantinuum/tket2/issues/2125)) ([b566382](https://github.com/Quantinuum/tket2/commit/b566382bb74e22af2e86fc69e9d3f7792528dbcb))
+
 ## [0.15.16](https://github.com/Quantinuum/tket2/compare/tket-py-v0.15.15...tket-py-v0.15.16) (2026-11-24)
 
 ### Features
