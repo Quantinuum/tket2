@@ -2835,7 +2835,7 @@ version = "0.1.1"
 
 [[package]]
 name = "tket"
-version = "0.23.1"
+version = "0.23.2"
 dependencies = [
  "anyhow",
  "ascent",
@@ -2939,7 +2939,7 @@ dependencies = [
 
 [[package]]
 name = "tket-qsystem"
-version = "0.30.1"
+version = "0.30.2"
 dependencies = [
  "anyhow",
  "clap",
