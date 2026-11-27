@@ -6,7 +6,7 @@ use hugr::llvm::emit::{EmitDebugInfo, Namer, test::SimpleHugrConfig};
 use hugr::llvm::inkwell::{self, context::Context, module::Module};
 use hugr::llvm::utils::{IntOpBuilder, LogicOpBuilder};
 use hugr::std_extensions::arithmetic::int_types::{ConstInt, int_type};
-use hugr::types::Signature;
+use hugr::types::{Signature, Type};
 use std::{
     alloc::{Layout, alloc, dealloc},
     cell::RefCell,
@@ -14,6 +14,7 @@ use std::{
     rc::Rc,
 };
 use tket::extension::cell::{self, CellOpBuilder};
+use tket::extension::measurement::measurement_type;
 
 fn emit<'c>(ctx: &'c Context, platform: QSystemPlatform, mut graph: Hugr) -> Module<'c> {
     crate::process_hugr(platform, &mut graph).unwrap();
@@ -32,6 +33,42 @@ fn emit<'c>(ctx: &'c Context, platform: QSystemPlatform, mut graph: Hugr) -> Mod
         .unwrap()
         .set_linkage(inkwell::module::Linkage::External);
     module
+}
+
+#[rstest::rstest]
+#[case::measurement(measurement_type(), 1)]
+#[case::tuple(Type::new_tuple([measurement_type(), bool_t(), measurement_type()]), 2)]
+fn prepare_measurement_cell_read_and_write(
+    #[case] payload: Type,
+    #[case] future_count: usize,
+    #[values(QSystemPlatform::Sol, QSystemPlatform::Helios)] platform: QSystemPlatform,
+) {
+    use hugr::HugrView;
+    use tket_qsystem::extension::futures::{FutureOp, FutureOpDef};
+
+    let handle = cell::cell_type(payload.clone());
+    let mut graph = SimpleHugrConfig::new()
+        .with_ins([handle.clone(), payload.clone()])
+        .with_outs([handle, payload.clone()])
+        .finish(|mut b| {
+            let [cell, replacement] = b.input_wires_arr();
+            let (cell, copied) = b.add_read_cell(cell, payload).unwrap();
+            let updated = b.add_write_cell(cell, replacement).unwrap();
+            b.finish_hugr_with_outputs([updated, copied]).unwrap()
+        });
+    crate::process_hugr(platform, &mut graph).unwrap();
+    graph.validate().unwrap();
+
+    // Read must retain each copied future, and Write must release each
+    // overwritten future, including those nested in a tuple.
+    for expected in [FutureOpDef::Dup, FutureOpDef::Free] {
+        let count = graph
+            .nodes()
+            .filter_map(|n| graph.get_optype(n).cast::<FutureOp>())
+            .filter(|op| op.op == expected)
+            .count();
+        assert_eq!(count, future_count, "{expected:?}");
+    }
 }
 
 fn lifecycle() -> Hugr {

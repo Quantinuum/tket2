@@ -376,6 +376,12 @@ impl Default for ReplaceTypes {
         res.meta_policy = MetadataPropagationPolicy::default();
         res.replace_consts_parametrized(array_type_def(), handlers::array_const);
         res.replace_consts_parametrized(list_type_def(), list_const);
+        // The callback uses the final payload type, including its copy recipe.
+        res.set_replace_parametrized_op_with_options(
+            crate::extension::cell::EXTENSION.get_op("Read").unwrap(),
+            handlers::linear_cell_read,
+            ReplacementOptions::default(),
+        );
         res
     }
 }
@@ -646,10 +652,22 @@ impl ReplaceTypes {
         dest_fn: impl Fn(&[TypeArg], &ReplaceTypes) -> Result<Option<NodeTemplate>, ReplaceTypesError>
         + 'static,
     ) {
-        self.param_ops.insert(
-            src.into(),
-            (Arc::new(dest_fn), ReplacementOptions::recursive()),
+        self.set_replace_parametrized_op_with_options(
+            src,
+            dest_fn,
+            ReplacementOptions::recursive(),
         );
+    }
+
+    fn set_replace_parametrized_op_with_options(
+        &mut self,
+        src: &OpDef,
+        dest_fn: impl Fn(&[TypeArg], &ReplaceTypes) -> Result<Option<NodeTemplate>, ReplaceTypesError>
+        + 'static,
+        options: ReplacementOptions,
+    ) {
+        self.param_ops
+            .insert(src.into(), (Arc::new(dest_fn), options));
     }
 
     /// Configures this instance to change [Const]s of type `src_ty`, using
@@ -1032,6 +1050,268 @@ pub(super) mod test {
         let mut ty = usize_t();
         assert!(ty.transform(&pass).unwrap());
         assert_eq!(ty, list_type(bool_t()));
+    }
+
+    #[test]
+    fn existing_cell_payload_and_dup_follow_composed_linear_replacements() {
+        use crate::extension::cell::{CellOpBuilder, cell_type};
+        let temp = cell_type(bool_t());
+        let mut b = DFGBuilder::new(inout_sig(
+            [cell_type(qb_t())],
+            [cell_type(qb_t()), cell_type(qb_t())],
+        ))
+        .unwrap();
+        let [p] = b.input_wires_arr();
+        let (a, b_out) = b.add_dup_cell(p, qb_t()).unwrap();
+        let mut graph = b.finish_hugr_with_outputs([a, b_out]).unwrap();
+        let mut first = ReplaceTypes::default();
+        first.set_replace_type(qb_t().as_extension().unwrap().clone(), temp.clone());
+        first.run(&mut graph).unwrap();
+        graph.validate().unwrap();
+        let target = array_type(2, qb_t());
+        let mut second = ReplaceTypes::default();
+        second.set_replace_type(temp.as_extension().unwrap().clone(), target.clone());
+        second.run(&mut graph).unwrap();
+        graph.validate().unwrap();
+        assert_eq!(
+            graph.signature(graph.entrypoint()).unwrap().into_owned(),
+            Signature::new(
+                [cell_type(target.clone())],
+                [cell_type(target.clone()), cell_type(target.clone())]
+            )
+        );
+        let dup = graph
+            .nodes()
+            .find_map(|n| {
+                graph
+                    .get_optype(n)
+                    .as_extension_op()
+                    .filter(|op| op.qualified_id() == "tket.cell.Dup")
+            })
+            .unwrap();
+        assert_eq!(dup.args(), [target.into()]);
+    }
+
+    #[rstest]
+    #[case(0, bool_t())]
+    #[case(1, qb_t())]
+    #[case(2, qb_t())]
+    #[case(4, qb_t())]
+    fn replace_value_with_shared_cell(#[case] uses: usize, #[case] payload: Type) {
+        use crate::extension::cell::cell_type;
+        let builder = DFGBuilder::new(inout_sig([usize_t()], vec![usize_t(); uses])).unwrap();
+        let [value] = builder.input_wires_arr();
+        let mut graph = builder.finish_hugr_with_outputs(vec![value; uses]).unwrap();
+        let mut pass = ReplaceTypes::default();
+        let cell = cell_type(payload);
+        pass.set_replace_type(usize_t().as_extension().unwrap().clone(), cell.clone());
+        super::handlers::register_cell_ownership(&mut pass);
+        pass.run(&mut graph).unwrap();
+        graph.validate().unwrap();
+        assert_eq!(
+            graph.signature(graph.entrypoint()).unwrap().as_ref(),
+            &inout_sig([cell.clone()], vec![cell; uses])
+        );
+        let ops = graph
+            .nodes()
+            .filter_map(|n| graph.get_optype(n).as_extension_op())
+            .map(|op| op.qualified_id().to_string())
+            .collect_vec();
+        if uses == 0 {
+            assert_eq!(ops, ["tket.cell.Free"]);
+        } else {
+            assert_eq!(ops, vec!["tket.cell.Dup"; uses - 1]);
+        }
+    }
+
+    #[test]
+    fn unused_cell_releases_its_linear_payload() {
+        use crate::extension::cell::cell_type;
+        let builder = DFGBuilder::new(inout_sig([usize_t()], [])).unwrap();
+        let graph = builder.finish_hugr_with_outputs([]).unwrap();
+        let mut pass = ReplaceTypes::default();
+        super::handlers::register_cell_ownership(&mut pass);
+        let mut missing_rule = graph.clone();
+        pass.set_replace_type(usize_t().as_extension().unwrap().clone(), cell_type(qb_t()));
+        assert_eq!(
+            pass.run(&mut missing_rule),
+            Err(super::ReplaceTypesError::LinearizeError(
+                super::LinearizeError::NeedCopyDiscard(Box::new(qb_t()))
+            ))
+        );
+
+        // Discarding an array of handles requires a module-level scan function
+        // reachable through the Some branch of the outer cell's release.
+        let mut graph = graph;
+        pass.set_replace_type(
+            usize_t().as_extension().unwrap().clone(),
+            cell_type(array_type(2, cell_type(bool_t()))),
+        );
+        pass.run(&mut graph).unwrap();
+        graph.validate().unwrap();
+        assert_eq!(
+            graph
+                .nodes()
+                .filter_map(|n| graph.get_optype(n).as_extension_op())
+                .filter(|op| op.qualified_id() == "tket.cell.Free")
+                .count(),
+            2
+        );
+    }
+
+    #[test]
+    fn cell_write_discards_at_the_final_replacement_type() {
+        use crate::extension::cell::{CellOpBuilder, cell_type};
+        let signature = |ty: Type| inout_sig([cell_type(ty.clone()), ty.clone()], [cell_type(ty)]);
+        let mut builder = DFGBuilder::new(signature(usize_t())).unwrap();
+        let [cell, new] = builder.input_wires_arr();
+        let cell = builder.add_write_cell(cell, new).unwrap();
+        let mut graph = builder.finish_hugr_with_outputs([cell]).unwrap();
+        let mut pass = ReplaceTypes::default();
+        super::handlers::register_cell_ownership(&mut pass);
+        let target = cell_type(usize_t());
+        pass.set_replace_type_with_options(
+            usize_t().as_extension().unwrap().clone(),
+            target.clone(),
+            super::ReplacementOptions::default(),
+        );
+        pass.run(&mut graph).unwrap();
+        graph.validate().unwrap();
+        assert_eq!(
+            graph.signature(graph.entrypoint()).unwrap().as_ref(),
+            &signature(target)
+        );
+        let ops = graph
+            .nodes()
+            .filter_map(|n| graph.get_optype(n).as_extension_op())
+            .map(|op| op.qualified_id().to_string())
+            .sorted()
+            .collect_vec();
+        assert_eq!(ops, ["tket.cell.Free", "tket.cell.Swap"]);
+    }
+
+    #[test]
+    fn cell_and_ptr_reads_keep_their_signatures_for_copyable_replacements() {
+        use crate::extension::cell::{CellOpBuilder, cell_type};
+        use hugr_core::std_extensions::ptr::{PtrOpBuilder, ptr_type};
+
+        let signature = |ty: Type| {
+            inout_sig(
+                [cell_type(ty.clone()), ptr_type(ty.clone())],
+                [cell_type(ty.clone()), ty.clone(), ty],
+            )
+        };
+        let mut builder = DFGBuilder::new(signature(usize_t())).unwrap();
+        let [cell, ptr] = builder.input_wires_arr();
+        let (cell, cell_value) = builder.add_read_cell(cell, usize_t()).unwrap();
+        let ptr_value = builder.add_read_ptr(ptr, usize_t()).unwrap();
+        let mut graph = builder
+            .finish_hugr_with_outputs([cell, cell_value, ptr_value])
+            .unwrap();
+
+        let mut pass = ReplaceTypes::default();
+        pass.set_replace_type(usize_t().as_extension().unwrap().clone(), bool_t());
+        pass.run(&mut graph).unwrap();
+        graph.validate().unwrap();
+        assert_eq!(
+            graph.signature(graph.entrypoint()).unwrap().as_ref(),
+            &signature(bool_t())
+        );
+        let ops = graph
+            .nodes()
+            .filter_map(|n| graph.get_optype(n).as_extension_op())
+            .map(|op| op.qualified_id().to_string())
+            .sorted()
+            .collect_vec();
+        assert_eq!(ops, ["ptr.Read", "tket.cell.Read"]);
+    }
+
+    #[test]
+    fn cell_read_duplicates_the_inner_handle_at_the_final_payload_type() {
+        use crate::extension::cell::{CellOp, CellOpBuilder, CellOpDef, cell_type};
+
+        let signature = |ty: Type| inout_sig([cell_type(ty.clone())], [cell_type(ty.clone()), ty]);
+        let mut builder = DFGBuilder::new(signature(usize_t())).unwrap();
+        let [cell] = builder.input_wires_arr();
+        let (cell, value) = builder.add_read_cell(cell, usize_t()).unwrap();
+        let mut graph = builder.finish_hugr_with_outputs([cell, value]).unwrap();
+
+        let mut pass = ReplaceTypes::default();
+        super::handlers::register_cell_ownership(&mut pass);
+        // The new handle still contains the source type. Rewriting the callback
+        // a second time would introduce an extra layer of Cell.
+        let inner = cell_type(usize_t());
+        pass.set_replace_type_with_options(
+            usize_t().as_extension().unwrap().clone(),
+            inner.clone(),
+            super::ReplacementOptions::default(),
+        );
+        pass.run(&mut graph).unwrap();
+        graph.validate().unwrap();
+        assert_eq!(
+            graph.signature(graph.entrypoint()).unwrap().as_ref(),
+            &signature(inner.clone())
+        );
+
+        let map = graph
+            .nodes()
+            .find(|&n| {
+                graph.get_optype(n).cast::<CellOp>()
+                    == Some(CellOp::map(inner.clone(), [], [inner.clone()]))
+            })
+            .unwrap();
+        let (load, _) = graph.single_linked_output(map, 1).unwrap();
+        let callback = graph.static_source(load).unwrap();
+        let copies = graph
+            .descendants(callback)
+            .filter_map(|n| graph.get_optype(n).cast::<CellOp>())
+            .collect_vec();
+        assert_eq!(copies, [CellOpDef::Dup.with_type(usize_t())]);
+    }
+
+    #[test]
+    fn repeated_cell_reads_link_array_copy_helpers() {
+        use crate::extension::cell::{CellOpBuilder, cell_type};
+        let ty = usize_t();
+        let cell = cell_type(ty.clone());
+        let mut builder =
+            DFGBuilder::new(inout_sig([cell.clone()], [cell, ty.clone(), ty.clone()])).unwrap();
+        let [handle] = builder.input_wires_arr();
+        let (handle, first) = builder.add_read_cell(handle, ty.clone()).unwrap();
+        let (handle, second) = builder.add_read_cell(handle, ty).unwrap();
+        let mut graph = builder
+            .finish_hugr_with_outputs([handle, first, second])
+            .unwrap();
+        let mut pass = ReplaceTypes::default();
+        super::handlers::register_cell_ownership(&mut pass);
+        pass.set_replace_type(
+            usize_t().as_extension().unwrap().clone(),
+            array_type(2, cell_type(bool_t())),
+        );
+        pass.run(&mut graph).unwrap();
+        graph.validate().unwrap();
+    }
+
+    #[test]
+    fn cell_read_requires_a_copy_recipe_for_a_linear_replacement() {
+        use crate::extension::cell::{CellOpBuilder, cell_type};
+        let mut builder = DFGBuilder::new(inout_sig(
+            [cell_type(usize_t())],
+            [cell_type(usize_t()), usize_t()],
+        ))
+        .unwrap();
+        let [cell] = builder.input_wires_arr();
+        let (cell, value) = builder.add_read_cell(cell, usize_t()).unwrap();
+        let mut graph = builder.finish_hugr_with_outputs([cell, value]).unwrap();
+
+        let mut pass = ReplaceTypes::default();
+        pass.set_replace_type(usize_t().as_extension().unwrap().clone(), qb_t());
+        assert_eq!(
+            pass.run(&mut graph),
+            Err(super::ReplaceTypesError::LinearizeError(
+                super::LinearizeError::NeedCopyDiscard(Box::new(qb_t()))
+            ))
+        );
     }
 
     pub(super) const PACKED_VEC: &str = "PackedVec";

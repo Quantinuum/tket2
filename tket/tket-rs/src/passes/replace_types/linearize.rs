@@ -5,6 +5,7 @@ use hugr_core::builder::{
     HugrBuilder, inout_sig,
 };
 use hugr_core::extension::{SignatureError, TypeDef};
+use hugr_core::hugr::linking::{NameLinkingPolicy, OnMultiDefn};
 use hugr_core::std_extensions::collections::array::array_type_def;
 use hugr_core::std_extensions::collections::borrow_array::borrow_array_type_def;
 use hugr_core::types::{CustomType, Signature, Term, Type, TypeArg, TypeRow};
@@ -318,9 +319,11 @@ impl Linearizer for DelegatingLinearizer {
                         .collect::<Vec<_>>(); // must collect to end borrow of `case_b` by closure
                     case_b.finish_with_outputs(outputs).unwrap();
                 }
-                Ok(NodeTemplate::CompoundOp(Box::new(
-                    cb.finish_hugr().unwrap(),
-                )))
+                // A variant's copy/discard recipe can reference module-level functions.
+                Ok(NodeTemplate::LinkedHugr(
+                    Box::new(cb.finish_hugr().unwrap()),
+                    NameLinkingPolicy::default().on_multiple_defn(OnMultiDefn::UseTarget),
+                ))
             }
             Term::ExtensionType(cty) => {
                 if let Some((copy, discard)) = self.copy_discard.get(cty) {

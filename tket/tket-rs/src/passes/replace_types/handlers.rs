@@ -2,11 +2,12 @@
 //! [`ReplaceTypes::set_replace_parametrized_op`]
 //! and [`DelegatingLinearizer::register_callback`](super::DelegatingLinearizer::register_callback)
 
+use crate::extension::cell::{self, CellOpBuilder, CellOpDef, cell_type};
 use crate::extension::guppy::{DROP_OP_NAME, GUPPY_EXTENSION};
 use crate::passes::mangle_name;
 use hugr_core::builder::{
-    Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder, SubContainer,
-    endo_sig, inout_sig,
+    BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
+    SubContainer, endo_sig, inout_sig,
 };
 use hugr_core::extension::SignatureError;
 use hugr_core::extension::prelude::{UnwrapBuilder, option_type, usize_t};
@@ -104,6 +105,140 @@ pub(super) const COPY_SCAN_PREFIX: &str = "__copy_scan";
 pub(super) const UNWRAP_PREFIX: &str = "__unwrap";
 
 pub(super) const MAKE_NONE_PREFIX: &str = "__mk_none";
+
+/// Configures [`ReplaceTypes`] to duplicate and release shared Cell handles.
+/// Opt in when copies of a replaced value should alias the same cell.
+///
+/// Fan-out uses `tket.cell.Dup` even for noncopyable payloads. An unused handle is
+/// released with `tket.cell.Free`. If its payload is linear, the linearizer must
+/// know how to discard the value returned on the last release. The same rule
+/// handles `tket.cell.Write` when replacement makes the overwritten payload linear.
+pub fn register_cell_ownership(lowerer: &mut ReplaceTypes) {
+    lowerer.linearizer_mut().register_callback(
+        cell::EXTENSION.get_type(&cell::CELL_TYPE_ID).unwrap(),
+        copy_discard_cell,
+    );
+    // The callback builds Swap and discard at the already-replaced payload type.
+    lowerer.set_replace_parametrized_op_with_options(
+        cell::EXTENSION
+            .get_op(CellOpDef::Write.opdef_id().as_str())
+            .unwrap(),
+        linear_cell_write,
+        super::ReplacementOptions::default(),
+    );
+}
+
+fn cell_payload(args: &[TypeArg]) -> Result<Type, SignatureError> {
+    let [payload] = args else {
+        return Err(TermKindError::WrongNumberArgs(args.len(), 1).into());
+    };
+    Ok(Type::try_from(payload.clone())?)
+}
+
+fn copy_discard_cell(
+    args: &[TypeArg],
+    uses: usize,
+    linearizer: &CallbackHandler,
+) -> Result<NodeTemplate, LinearizeError> {
+    let payload = cell_payload(args)?;
+    if uses == 2 {
+        return Ok(NodeTemplate::SingleOp(
+            CellOpDef::Dup.with_type(payload).into(),
+        ));
+    }
+    let handle_ty = cell_type(payload.clone());
+    let mut builder =
+        DFGBuilder::new(inout_sig([handle_ty.clone()], vec![handle_ty; uses])).unwrap();
+    let [mut handle] = builder.input_wires_arr();
+    let mut outputs = Vec::with_capacity(uses);
+    if uses == 0 {
+        let released = builder.add_free_cell(handle, payload.clone()).unwrap();
+        if !payload.copyable() {
+            // Free returns Some(payload) only for the last live handle.
+            let released_ty = Type::from(option_type([payload]));
+            linearizer
+                .copy_discard_op(&released_ty, 0)?
+                .add(&mut builder, [released])
+                .map_err(|e| {
+                    LinearizeError::NestedTemplateError(Box::new(released_ty), Box::new(e))
+                })?;
+        }
+    } else {
+        for _ in 1..uses {
+            let (retained, alias) = builder.add_dup_cell(handle, payload.clone()).unwrap();
+            outputs.push(alias);
+            handle = retained;
+        }
+        outputs.push(handle);
+    }
+    Ok(NodeTemplate::LinkedHugr(
+        Box::new(builder.finish_hugr_with_outputs(outputs).unwrap()),
+        NameLinkingPolicy::default().on_multiple_defn(OnMultiDefn::UseTarget),
+    ))
+}
+
+/// Map keeps the first copy in the cell and returns the second to the reader.
+pub(super) fn linear_cell_read(
+    args: &[TypeArg],
+    lowerer: &ReplaceTypes,
+) -> Result<Option<NodeTemplate>, ReplaceTypesError> {
+    let payload = cell_payload(args)?;
+    if payload.copyable() {
+        return Ok(None);
+    }
+    let copy = lowerer.get_linearizer().copy_discard_op(&payload, 2)?;
+    // A linked copy recipe can bring its own helpers (e.g. array.scan callbacks).
+    // Preserve its linking policy when the enclosing Map is inserted.
+    let policy = match &copy {
+        NodeTemplate::LinkedHugr(_, policy) => policy.clone(),
+        _ => NameLinkingPolicy::default(),
+    };
+    let build = || -> Result<_, BuildError> {
+        let cell = cell_type(payload.clone());
+        let mut builder = DFGBuilder::new(inout_sig([cell.clone()], [cell, payload.clone()]))?;
+        let callback = {
+            let mut module = builder.module_root_builder();
+            let mut function = module.define_function_vis(
+                mangle_name("__cell_read_copy", &[payload.clone().into()]),
+                inout_sig([payload.clone()], [payload.clone(), payload.clone()]),
+                Visibility::Private,
+            )?;
+            let [value] = function.input_wires_arr();
+            let copies = copy.add(&mut function, [value])?;
+            function.finish_with_outputs(copies.outputs())?
+        };
+        let [handle] = builder.input_wires_arr();
+        let callback = builder.load_func(callback.handle(), &[])?;
+        let (handle, copied) =
+            builder.add_map_cell(handle, callback, payload.clone(), [], [payload.clone()])?;
+        builder.finish_hugr_with_outputs([handle, copied[0]])
+    };
+    let graph =
+        build().map_err(|e| LinearizeError::NestedTemplateError(Box::new(payload), Box::new(e)))?;
+    Ok(Some(NodeTemplate::LinkedHugr(Box::new(graph), policy)))
+}
+
+fn linear_cell_write(
+    args: &[TypeArg],
+    lowerer: &ReplaceTypes,
+) -> Result<Option<NodeTemplate>, ReplaceTypesError> {
+    let payload = cell_payload(args)?;
+    if payload.copyable() {
+        return Ok(None);
+    }
+    let discard = lowerer.get_linearizer().copy_discard_op(&payload, 0)?;
+    let cell = cell_type(payload.clone());
+    let mut builder = DFGBuilder::new(inout_sig([cell.clone(), payload.clone()], [cell])).unwrap();
+    let [handle, value] = builder.input_wires_arr();
+    let (handle, old) = builder.add_swap_cell(handle, value).unwrap();
+    discard
+        .add(&mut builder, [old])
+        .map_err(|e| LinearizeError::NestedTemplateError(Box::new(payload), Box::new(e)))?;
+    Ok(Some(NodeTemplate::LinkedHugr(
+        Box::new(builder.finish_hugr_with_outputs([handle]).unwrap()),
+        NameLinkingPolicy::default().on_multiple_defn(OnMultiDefn::UseTarget),
+    )))
+}
 
 /// Handler for copying/discarding arrays if their elements have become linear.
 ///
