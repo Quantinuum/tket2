@@ -2,6 +2,7 @@
 
 from . import (
     argument,
+    cell,
     debug,
     futures,
     global_phase,
@@ -20,6 +21,7 @@ from . import (
 
 __all__ = [
     "argument",
+    "cell",
     "bool",
     "debug",
     "futures",

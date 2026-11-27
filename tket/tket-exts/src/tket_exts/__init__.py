@@ -6,6 +6,7 @@ from hugr.ext import Extension, ExtensionRegistry
 
 from tket_exts import tket
 from tket_exts.tket.argument import ArgumentExtension
+from tket_exts.tket.cell import CellExtension
 from tket_exts.tket.debug import DebugExtension
 from tket_exts.tket.futures import FuturesExtension
 from tket_exts.tket.global_phase import GlobalPhaseExtension
@@ -34,6 +35,7 @@ __version__ = "0.14.3"
 
 __all__ = [
     "argument",
+    "cell",
     "debug",
     "futures",
     "global_phase",
@@ -55,6 +57,7 @@ __all__ = [
     "wasm",
 ]
 
+cell: CellExtension = CellExtension()
 debug: DebugExtension = tket.debug.DebugExtension()
 gpu: GpuExtension = tket.gpu.GpuExtension()
 guppy: GuppyExtension = tket.guppy.GuppyExtension()
@@ -88,6 +91,7 @@ def tket_registry() -> ExtensionRegistry:
         An ExtensionRegistry containing all the tket extensions.
     """
     tket_exts: list[Callable[[], Extension]] = [
+        cell,
         tket.debug.DebugExtension(),
         tket.gpu.GpuExtension(),
         tket.guppy.GuppyExtension(),
