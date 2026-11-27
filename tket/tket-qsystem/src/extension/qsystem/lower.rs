@@ -17,7 +17,9 @@ use hugr::{
 use lazy_static::lazy_static;
 use tket::extension::measurement::{MeasurementOp, measurement_custom_type};
 use tket::passes::composable::WithScope;
-use tket::passes::replace_types::handlers::register_linear_array_op_replacements;
+use tket::passes::replace_types::handlers::{
+    register_cell_ownership, register_linear_array_op_replacements,
+};
 use tket::passes::replace_types::{NodeTemplate, ReplaceTypesError};
 use tket::passes::{ComposablePass, PassScope, ReplaceTypes};
 use tket::{TketOp, extension::rotation::RotationOpBuilder};
@@ -208,6 +210,7 @@ fn register_measurement_replacements(lowerer: &mut ReplaceTypes) {
     // `Futures`. Note we don't need to deal with static arrays as you cannot
     // create static arrays of `Measurement`` values in Guppy.
     register_linear_array_op_replacements(lowerer);
+    register_cell_ownership(lowerer);
 }
 
 /// Lower [`TketOp`] operations to target QSystem operations.
@@ -1543,6 +1546,88 @@ mod test {
             !h.nodes()
                 .filter_map(|n| h.get_optype(n).as_extension_op())
                 .any(|op| MeasurementOp::from_op(op).is_ok())
+        );
+    }
+
+    #[rstest]
+    #[case(QSystemPlatform::Helios)]
+    #[case(QSystemPlatform::Sol)]
+    fn cell_read_duplicates_the_measurement_future(#[case] platform: QSystemPlatform) {
+        use tket::extension::cell::{CellOpBuilder, cell_type};
+
+        let signature = |payload: Type| {
+            let cell = cell_type(payload.clone());
+            inout_sig([cell.clone()], [cell, payload])
+        };
+        let mut builder = DFGBuilder::new(signature(measurement_type())).unwrap();
+        let [cell] = builder.input_wires_arr();
+        let (cell, value) = builder.add_read_cell(cell, measurement_type()).unwrap();
+        let mut h = builder.finish_hugr_with_outputs([cell, value]).unwrap();
+
+        lower_tk2_ops(&mut h, PassScope::Global(Preserve::Public), platform).unwrap();
+        h.validate().unwrap();
+        assert_eq!(
+            h.signature(h.entrypoint()).unwrap().as_ref(),
+            &signature(future_type(bool_t()))
+        );
+
+        // Follow Map's function input to check the copy inside the callback.
+        let map = h
+            .nodes()
+            .find(|&n| {
+                h.get_optype(n)
+                    .as_extension_op()
+                    .is_some_and(|op| op.qualified_id() == "tket.cell.Map")
+            })
+            .unwrap();
+        let (load, _) = h.single_linked_output(map, 1).unwrap();
+        let (callback, _) = h.single_linked_output(load, 0).unwrap();
+        let copies = h
+            .descendants(callback)
+            .filter_map(|n| h.get_optype(n).cast::<FutureOp>())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            copies,
+            [FutureOp {
+                op: FutureOpDef::Dup,
+                typ: bool_t()
+            }]
+        );
+    }
+
+    #[rstest]
+    #[case(QSystemPlatform::Helios)]
+    #[case(QSystemPlatform::Sol)]
+    fn cell_write_releases_the_previous_measurement_future(#[case] platform: QSystemPlatform) {
+        use tket::extension::cell::{CellOp, CellOpBuilder, CellOpDef, cell_type};
+
+        let signature = |ty: Type| inout_sig([cell_type(ty.clone()), ty.clone()], [cell_type(ty)]);
+        let mut builder = DFGBuilder::new(signature(measurement_type())).unwrap();
+        let [cell, new] = builder.input_wires_arr();
+        let updated = builder.add_write_cell(cell, new).unwrap();
+        let mut graph = builder.finish_hugr_with_outputs([updated]).unwrap();
+        lower_tk2_ops(&mut graph, PassScope::Global(Preserve::Public), platform).unwrap();
+        graph.validate().unwrap();
+        assert_eq!(
+            graph.signature(graph.entrypoint()).unwrap().as_ref(),
+            &signature(future_type(bool_t()))
+        );
+        let swap = graph
+            .nodes()
+            .find(|&n| {
+                graph
+                    .get_optype(n)
+                    .cast::<CellOp>()
+                    .is_some_and(|op| op.def == CellOpDef::Swap)
+            })
+            .unwrap();
+        let (free, _) = graph.single_linked_input(swap, 1).unwrap();
+        assert_eq!(
+            graph.get_optype(free).cast::<FutureOp>(),
+            Some(FutureOp {
+                op: FutureOpDef::Free,
+                typ: bool_t()
+            })
         );
     }
 
