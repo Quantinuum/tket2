@@ -468,7 +468,8 @@ jobs:
   # Ensure that serialized extensions match rust implementation
   tket-extensions:
     needs: [changes, tests-rs-stable-all-features]
-    if: ${{ needs.changes.outputs.tket == 'true' && github.event_name != 'merge_group' }}
+    needs: [changes]
+    if: ${{ (needs.changes.outputs.tket == 'true' || needs.changes.outputs.extensions == 'true') && github.event_name != 'merge_group' }}
     name: Check standard extensions
     runs-on: ubuntu-latest
     steps:
@@ -483,7 +484,9 @@ jobs:
       - name: Check if the declarations are up to date
         run: |
           git diff --exit-code --name-only tket/tket-exts/src/tket_exts/data
-          if [ $? -ne 0 ]; then
+          changed=$(git status --short -- tket/tket-exts/src/tket_exts/data tket/tket-migrate/extensions)
+          if [ -n "$changed" ]; then
+            printf '%s\n' "$changed"
             echo "The serialized standard extensions are not up to date"
             echo "Please run 'just tket/gen-extensions' and commit the changes.
             Bump the version of tket-exts according to semver.
