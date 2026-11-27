@@ -4,6 +4,7 @@ use hugr::Extension;
 use hugr::builder::{DFGBuilder, Dataflow, DataflowHugr};
 use hugr::extension::Version;
 use hugr::extension::prelude::{bool_t, qb_t};
+use hugr::ops::constant::CustomSerialized;
 use hugr::ops::{
     Value,
     constant::{CustomConst, ValueName, downcast_equal_consts},
@@ -181,7 +182,17 @@ impl CustomConst for ConstBool {
 fn get_bool_const_map() -> ConstMapping {
     let mut mapping = ConstMapping::new("tket.bool".into(), Version::new(0, 2, 0));
     mapping.insert("bool", |value, _| {
-        let b = value.value().downcast_ref::<ConstBool>().unwrap();
+        let b = if let Some(b) = value.value().downcast_ref::<ConstBool>() {
+            b.clone()
+        } else if let Some(b) = value.value().downcast_ref::<CustomSerialized>() {
+            b.clone()
+                .try_into_custom_const::<ConstBool>()
+                .expect(&format!("bad CustomSerialized bool: {b:?}"))
+        } else {
+            panic!("Unsupported bool constant {value:?}")
+        };
+
+        // let b = value.value().downcast_ref::<ConstBool>().unwrap();
         Ok(Value::from_bool(b.0))
     });
     mapping

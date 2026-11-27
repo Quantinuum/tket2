@@ -45,6 +45,9 @@ impl Migration {
     ///
     /// All type replacements are registered before operation templates are built.
     fn apply(&self, mut hugr: Hugr) -> Result<Hugr, MigrationError> {
+        // Retain the input definitions before replacements update the graph's registry.
+        let mut registry = LOCAL_REGISTRY.clone();
+        registry.extend(hugr.extensions());
         let mut replacer = ReplaceTypes::new_with_op_version_matching(true);
 
         for (old_type, new_type) in self.type_mappings.iter().flat_map(VersionedMapping::iter) {
@@ -74,7 +77,7 @@ impl Migration {
         }
 
         replacer.run(&mut hugr)?;
-        hugr.resolve_extension_defs(&LOCAL_REGISTRY).unwrap();
+        hugr.resolve_extension_defs(&registry).unwrap();
         hugr.validate()?;
 
         Ok(hugr)
@@ -84,7 +87,8 @@ impl Migration {
 /// Upgrades `tket.quantum@0.2.1` operations to `0.3.0` and migrates
 /// `tket.bool@0.2.0` operations, types, and constants to their HUGR equivalents.
 ///
-/// Returns the validated HUGR after resolving extension definitions against the bundled registry.
+/// Returns the validated HUGR after resolving extension definitions against the bundled
+/// registry combined with the input HUGR's definitions.
 pub fn migrate_hugr_default(hugr: Hugr) -> Result<Hugr, MigrationError> {
     DEFAULT_MIGRATION.apply(hugr)
 }
@@ -266,13 +270,14 @@ mod tests {
     use super::{Migration, migrate_bytes_default, migrate_hugr_default, test_helpers::*};
     use crate::update_maps::{OpMapping, OpReplacementTemplate, SimpleTemplate};
     use hugr::{
-        Hugr, HugrView,
+        Extension, Hugr, HugrView,
         builder::{DFGBuilder, Dataflow, DataflowHugr},
         envelope::EnvelopeConfig,
-        extension::Version,
+        extension::{Version, prelude::bool_t},
         hugr::hugrmut::HugrMut,
         ops::{DataflowOpTrait, OpTrait},
         package::Package,
+        types::Signature,
     };
     use std::{error::Error, path::PathBuf};
     use tket::passes::replace_types::NodeTemplate;
@@ -299,6 +304,60 @@ mod tests {
         let new_hugr = Migration::new().apply(hugr)?;
         new_hugr.validate()?;
         assert_eq!(new_hugr.mermaid_string(), before);
+        Ok(())
+    }
+
+    #[test]
+    fn migration_preserves_custom_extensions() -> Result<(), Box<dyn Error>> {
+        let extension = Extension::new_arc(
+            "custom".try_into()?,
+            Version::new(0, 1, 0),
+            |extension, weak| {
+                extension
+                    .add_op(
+                        "identity".into(),
+                        String::new(),
+                        Signature::new_endo([bool_t()]),
+                        weak,
+                    )
+                    .unwrap();
+            },
+        );
+        let custom_op = extension.instantiate_extension_op("identity", [])?;
+        let legacy = crate::extension_loading::get_extension("tket.bool", &Version::new(0, 2, 0))?;
+        let mut builder = DFGBuilder::new(Signature::new_endo([bool_t()]))?;
+        let [input] = builder.input_wires_arr();
+        let value = builder
+            .add_dataflow_op(legacy.instantiate_extension_op("make_opaque", [])?, [input])?
+            .out_wire(0);
+        let value = builder
+            .add_dataflow_op(legacy.instantiate_extension_op("read", [])?, [value])?
+            .out_wire(0);
+        let output = builder
+            .add_dataflow_op(custom_op.clone(), [value])?
+            .out_wire(0);
+        let hugr = builder.finish_hugr_with_outputs([output])?;
+        hugr.validate()?;
+
+        // Include the custom definition so the serialized input is self-contained.
+        let mut package = Package::from_hugr(hugr.clone());
+        package.extensions = hugr.extensions().clone();
+        let mut bytes = Vec::new();
+        package.store(&mut bytes, EnvelopeConfig::text())?;
+
+        for migrated in [
+            migrate_hugr_default(hugr)?,
+            migrate_bytes_default(bytes.as_slice())?,
+        ] {
+            migrated.validate()?;
+            assert!(migrated.extensions().contains("custom"));
+            assert!(
+                migrated.nodes().any(|node| {
+                    migrated.get_optype(node).as_extension_op() == Some(&custom_op)
+                })
+            );
+            assert!(!migrated.extensions().contains("tket.bool"));
+        }
         Ok(())
     }
 

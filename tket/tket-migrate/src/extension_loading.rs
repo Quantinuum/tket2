@@ -98,7 +98,7 @@ fn local_registry() -> ExtensionRegistry {
     })
     .collect::<Vec<_>>();
 
-    let mut registry = hugr::std_extensions::STD_REG.clone();
+    let mut registry = tket::extension::REGISTRY.clone();
 
     let legacy_registry =
         ExtensionRegistry::new_with_extension_resolution(legacy_extensions, &(&registry).into())
