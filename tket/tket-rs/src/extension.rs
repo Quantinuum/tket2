@@ -18,7 +18,6 @@ use hugr::types::{PolyFuncType, PolyFuncTypeRV};
 use lazy_static::lazy_static;
 use smol_str::SmolStr;
 
-/// Definition for cell ops.
 pub mod cell;
 /// Definition for debug ops.
 pub mod debug;
