@@ -6,6 +6,7 @@ use crate::hugr::llvm::custom::CodegenExtsMap;
 use crate::hugr::llvm::extension::int::IntCodegenExtension;
 use anyhow::{Context as _, Result};
 use tket::hugr::Hugr;
+use tket::llvm::cell::{CellCodegenExtension, DefaultCellCodegen};
 use tket::llvm::global_phase::GlobalPhaseCodegenExtension;
 use tket::llvm::rotation::RotationCodegenExtension;
 use tket_qsystem::QSystemPlatform;
@@ -51,6 +52,10 @@ pub(crate) fn codegen_extensions(platform: QSystemPlatform) -> CodegenExtsMap<'s
     CodegenExtsBuilder::default()
         .add_prelude_extensions(prelude.clone())
         .add_extension(IntCodegenExtension::new(prelude.clone()))
+        .add_extension(CellCodegenExtension::new(DefaultCellCodegen::new(
+            prelude.clone(),
+            SeleneHeapArrayCodegen,
+        )))
         .add_math_extensions() // This also adds the float extension
         .add_conversion_extensions()
         .add_logic_extensions()
@@ -77,3 +82,6 @@ pub(crate) fn codegen_extensions(platform: QSystemPlatform) -> CodegenExtsMap<'s
         ))
         .finish()
 }
+
+#[cfg(test)]
+mod cell_tests;
