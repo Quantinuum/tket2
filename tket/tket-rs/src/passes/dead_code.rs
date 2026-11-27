@@ -6,6 +6,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 
+use crate::extension::cell;
 use crate::passes::composable::WithScope;
 use crate::passes::{ComposablePass, PassScope};
 
@@ -75,6 +76,7 @@ impl PreserveNode {
     /// A conservative default for a given node. Just examines the node's [`OpType`]:
     /// * Assumes all Calls must be preserved. (One could scan the called `FuncDefn`, but would
     ///   also need to check for cycles in the [`ModuleGraph`](hugr_core::module_graph::ModuleGraph).)
+    /// * Preserves `tket.cell.Map` because its callback may have observable effects.
     /// * Assumes all CFGs must be preserved. (One could, for example, allow acyclic
     ///   CFGs to be removed.)
     /// * Assumes all `TailLoops` must be preserved. (One could, for example, use dataflow
@@ -82,6 +84,18 @@ impl PreserveNode {
     pub fn default_for<H: HugrView>(h: &H, n: H::Node) -> PreserveNode {
         match h.get_optype(n) {
             OpType::CFG(_) | OpType::TailLoop(_) | OpType::Call(_) => PreserveNode::MustKeep,
+            op => Self::ignoring_termination(op),
+        }
+    }
+
+    /// Preserve callback effects even when the caller allows termination to change.
+    pub(super) fn ignoring_termination(op: &OpType) -> Self {
+        match op {
+            OpType::ExtensionOp(op)
+                if op.extension_id() == &cell::EXTENSION_ID && op.unqualified_id() == "Map" =>
+            {
+                Self::MustKeep
+            }
             _ => Self::DeferToChildren,
         }
     }
@@ -418,6 +432,37 @@ mod test {
             ext_ops.sorted().collect_vec(),
             ["gate", "gate", "measure", "new"]
         );
+    }
+
+    #[rstest::rstest]
+    #[case::dce(DeadCodeElimPass::default())]
+    #[case::constant_fold(crate::passes::ConstantFoldPass::default())]
+    #[case::increase_termination(crate::passes::ConstantFoldPass::default().allow_increase_termination())]
+    fn preserve_cell_map_callback(#[case] pass: impl ComposablePass<Hugr>) {
+        use crate::extension::cell::CellOpBuilder;
+        use hugr_core::types::{FuncValueType, Type};
+
+        let callback = Type::new_function(FuncValueType::new([bool_t()], [bool_t()]));
+        let sig = Signature::new([callback, bool_t()], vec![]);
+        let mut builder = DFGBuilder::new(sig.clone()).unwrap();
+        let inputs = builder.input_wires_arr::<2>();
+        let mut nested = builder.dfg_builder(sig, inputs).unwrap();
+        let [callback, value] = nested.input_wires_arr();
+
+        let cell = nested.add_new_cell(value).unwrap();
+        let (mapped, _) = nested
+            .add_map_cell(cell, callback, bool_t(), [], vec![])
+            .unwrap();
+        nested.add_free_cell(mapped, bool_t()).unwrap();
+        let unused = nested.add_new_cell(value).unwrap();
+        nested.add_free_cell(unused, bool_t()).unwrap();
+        nested.finish_with_outputs([]).unwrap();
+
+        let mut hugr = builder.finish_hugr_with_outputs([]).unwrap();
+        pass.run(&mut hugr).unwrap();
+        hugr.validate().unwrap();
+        assert!(hugr.contains_node(mapped.node()));
+        assert!(!hugr.contains_node(unused.node()));
     }
 
     #[test]
