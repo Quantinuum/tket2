@@ -21,8 +21,8 @@ from . import (
 
 __all__ = [
     "argument",
-    "cell",
     "bool",
+    "cell",
     "debug",
     "futures",
     "global_phase",
