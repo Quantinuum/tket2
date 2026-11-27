@@ -2,7 +2,7 @@
 //!
 //! `Future<t>` is a linear type representing a value that will be available in
 //! the future.  It can be consumed by `Read`, returning a `t`.  It can be
-//! duplicated by `Dup`, and discarded with `Free`.
+//! duplicated by `Dup`, and discarded with `Free`, only when `t` is copyable.
 use std::sync::{Arc, Weak};
 
 use hugr::{
@@ -26,7 +26,7 @@ use strum::{EnumIter, EnumString, IntoStaticStr};
 /// The ID of the `tket.futures` extension.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("tket.futures");
 /// The "tket.futures" extension version
-pub const EXTENSION_VERSION: Version = Version::new(0, 2, 0);
+pub const EXTENSION_VERSION: Version = Version::new(0, 3, 0);
 
 lazy_static! {
     /// The "tket.futures" extension.
@@ -92,9 +92,9 @@ pub fn future_type(t: Type) -> Type {
 pub enum FutureOpDef {
     /// Read a value from a Future, consuming it.
     Read,
-    /// Duplicate a Future. The original Future is consumed and two Futures are returned.
+    /// Duplicate a Future of a copyable type, consuming it and returning two Futures.
     Dup,
-    /// Consume a future without reading it.
+    /// Consume a future of a copyable type without reading it.
     Free,
 }
 
@@ -104,26 +104,22 @@ impl MakeOpDef for FutureOpDef {
     }
 
     fn init_signature(&self, extension_ref: &Weak<Extension>) -> SignatureFunc {
-        let t_param = TypeParam::from(TypeBound::Linear);
-        let t_type = Type::new_var_use(0, TypeBound::Linear);
+        let bound = match self {
+            Self::Read => TypeBound::Linear,
+            Self::Dup | Self::Free => TypeBound::Copyable,
+        };
+        let t_param = TypeParam::from(bound);
+        let t_type = Type::new_var_use(0, bound);
         let future_type = Type::new_extension(future_custom_type(t_type.clone(), extension_ref));
-        match self {
-            FutureOpDef::Read => {
-                PolyFuncType::new([t_param], Signature::new(vec![future_type], vec![t_type])).into()
-            }
-            FutureOpDef::Dup => PolyFuncType::new(
-                [t_param],
-                Signature::new(
-                    vec![future_type.clone()],
-                    vec![future_type.clone(), future_type],
-                ),
-            )
-            .into(),
-            FutureOpDef::Free => {
-                PolyFuncType::new([t_param], Signature::new(vec![future_type.clone()], vec![]))
-                    .into()
-            }
-        }
+        let signature = match self {
+            Self::Read => Signature::new(vec![future_type], vec![t_type]),
+            Self::Dup => Signature::new(
+                vec![future_type.clone()],
+                vec![future_type.clone(), future_type],
+            ),
+            Self::Free => Signature::new(vec![future_type], vec![]),
+        };
+        PolyFuncType::new([t_param], signature).into()
     }
 
     fn extension(&self) -> ExtensionId {
@@ -138,10 +134,10 @@ impl MakeOpDef for FutureOpDef {
         match self {
             FutureOpDef::Read => "Read a value from a Future, consuming it".into(),
             FutureOpDef::Dup => {
-                "Duplicate a Future. The original Future is consumed and two Futures are returned"
+                "Duplicate a Future of a copyable type, consuming it and returning two Futures"
                     .into()
             }
-            FutureOpDef::Free => "Consume a future without reading it.".into(),
+            FutureOpDef::Free => "Consume a future of a copyable type without reading it.".into(),
         }
     }
 
@@ -307,9 +303,52 @@ pub(crate) mod test {
     }
 
     #[test]
+    fn linear_payload_cannot_be_duplicated_or_freed() {
+        for typ in [
+            hugr::extension::prelude::qb_t(),
+            Type::new_var_use(0, TypeBound::Linear),
+        ] {
+            for op in [FutureOpDef::Dup, FutureOpDef::Free] {
+                assert!(
+                    FutureOp {
+                        op,
+                        typ: typ.clone()
+                    }
+                    .to_extension_op()
+                    .is_err()
+                );
+            }
+            assert!(
+                FutureOp {
+                    op: FutureOpDef::Read,
+                    typ
+                }
+                .to_extension_op()
+                .is_ok()
+            );
+        }
+    }
+
+    #[test]
+    fn copyable_payload_supports_all_operations() {
+        for typ in [Type::UNIT, Type::new_var_use(0, TypeBound::Copyable)] {
+            for op in FutureOpDef::iter() {
+                assert!(
+                    FutureOp {
+                        op,
+                        typ: typ.clone()
+                    }
+                    .to_extension_op()
+                    .is_ok()
+                );
+            }
+        }
+    }
+
+    #[test]
     fn circuit() {
-        let t_param = TypeParam::from(TypeBound::Linear);
-        let t = Type::new_var_use(0, TypeBound::Linear);
+        let t_param = TypeParam::from(TypeBound::Copyable);
+        let t = Type::new_var_use(0, TypeBound::Copyable);
         let future_type = future_type(t.clone());
 
         let hugr = {
