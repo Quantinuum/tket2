@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.3](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.5.2...qis-compiler-v0.5.3) (2026-11-24)
+
+### Features
+
+* Lower global phase operations to no-ops during LLVM code generation ([#2175](https://github.com/Quantinuum/tket2/pull/2175))
+* Resolve `power` modifiers with an unsigned 64-bit runtime exponent during QSystem lowering ([#2103](https://github.com/Quantinuum/tket2/pull/2103))
+
+### Bug Fixes
+
+* Apply modifiers to global phases inside classical dataflow graphs and conditionals ([#2162](https://github.com/Quantinuum/tket2/pull/2162))
+* Preserve order edges on `GlobalPhase` operations during modifier resolution ([#2171](https://github.com/Quantinuum/tket2/pull/2171))
+* Update the native HUGR dependency to 0.31.1 to fix deserialization of constant definitions ([#2182](https://github.com/Quantinuum/tket2/pull/2182))
+
 ## [0.5.2](https://github.com/Quantinuum/tket2/compare/qis-compiler-v0.5.1...qis-compiler-v0.5.2) (2026-11-12)
 
 This release fixes modifier resolution and a memory leak when recording array

@@ -32,6 +32,13 @@ test-python *TEST_ARGS:
     uv run pytest tket/tket-py tket/tket-exts tket/tket-eccs "$@"
     uv run --package selene-hugr-qis-compiler pytest tket/qis-compiler "$@"
 
+# Run the Selene integration tests for pass semantics.
+[positional-arguments]
+test-semantics *TEST_ARGS:
+    uv run --all-packages --group selene-tests pytest \
+        tket/qis-compiler/python/tests/test_qsystem_semantics.py \
+        test_files/run_modifier_examples/test_selene.py "$@"
+
 # Check tket's Rust and Python code.
 check: check-rust check-python
 

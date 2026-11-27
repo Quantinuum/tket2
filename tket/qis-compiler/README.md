@@ -53,6 +53,15 @@ bitcode_x86_64_windows = state.compile_to_bitcode(
 
 ## Development
 
+### Selene integration tests
+
+The integration tests compile HUGRs from this checkout and use Selene to run
+the emitted LLVM bitcode. Run them from the repository root.
+
+```sh
+just tket/test-semantics
+```
+
 ### Snapshot testing
 This package uses snapshot testing for its compiler output.
 Sample programs are defined using guppy in the script `python/tests/generate_hugrs.py`.
