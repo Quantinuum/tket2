@@ -1,6 +1,6 @@
 //! This module defines the Hugr extensions used to represent circuits.
 //!
-//! This includes a extension for the opaque TKET1 operations.
+//! This includes an extension for the opaque TKET1 operations.
 
 use std::sync::Arc;
 
@@ -18,6 +18,7 @@ use hugr::types::{PolyFuncType, PolyFuncTypeRV};
 use lazy_static::lazy_static;
 use smol_str::SmolStr;
 
+pub mod cell;
 /// Definition for debug ops.
 pub mod debug;
 pub mod global_phase;
@@ -67,10 +68,11 @@ pub static ref REGISTRY: ExtensionRegistry = ExtensionRegistry::new(
 /// The list is used to build [`REGISTRY`] and by downstream crates that need to
 /// extend the same base set without maintaining a second copy of the tket
 /// extension list.
-pub fn tket_extensions() -> [Arc<Extension>; 9] {
+pub fn tket_extensions() -> [Arc<Extension>; 10] {
     [
         TKET1_EXTENSION.to_owned(),
         TKET_EXTENSION.to_owned(),
+        cell::EXTENSION.to_owned(),
         debug::DEBUG_EXTENSION.to_owned(),
         global_phase::GLOBAL_PHASE_EXTENSION.to_owned(),
         guppy::GUPPY_EXTENSION.to_owned(),

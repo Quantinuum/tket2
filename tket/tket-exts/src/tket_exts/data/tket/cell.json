@@ -1,0 +1,567 @@
+{
+  "version": "0.1.0",
+  "name": "tket.cell",
+  "types": {
+    "cell": {
+      "extension": "tket.cell",
+      "name": "cell",
+      "params": [
+        {
+          "tp": "Type",
+          "b": "A"
+        }
+      ],
+      "description": "Linear handle to a shared mutable cell.",
+      "bound": {
+        "b": "Explicit",
+        "bound": "A"
+      }
+    }
+  },
+  "operations": {
+    "Dup": {
+      "extension": "tket.cell",
+      "name": "Dup",
+      "description": "Return two handles to the same cell without copying the stored value.",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "tket.cell",
+              "extension_version": "0.1.0",
+              "id": "cell",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "tket.cell",
+              "extension_version": "0.1.0",
+              "id": "cell",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "Opaque",
+              "extension": "tket.cell",
+              "extension_version": "0.1.0",
+              "id": "cell",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "Eq": {
+      "extension": "tket.cell",
+      "name": "Eq",
+      "description": "Compare cell identity without reading the stored values, returning both handles in input order and a boolean.",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "tket.cell",
+              "extension_version": "0.1.0",
+              "id": "cell",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "Opaque",
+              "extension": "tket.cell",
+              "extension_version": "0.1.0",
+              "id": "cell",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "tket.cell",
+              "extension_version": "0.1.0",
+              "id": "cell",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "Opaque",
+              "extension": "tket.cell",
+              "extension_version": "0.1.0",
+              "id": "cell",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "Free": {
+      "extension": "tket.cell",
+      "name": "Free",
+      "description": "Release a handle, returning Some(value) for the last handle and None otherwise.",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "tket.cell",
+              "extension_version": "0.1.0",
+              "id": "cell",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "General",
+              "rows": [
+                [],
+                [
+                  {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                ]
+              ]
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "Map": {
+      "extension": "tket.cell",
+      "name": "Map",
+      "description": "Apply a function to the stored value and extra inputs, install its replacement, and return the cell and extra outputs. The callback has exclusive access to the payload. Reentrant payload access through an alias must trap.",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "A"
+          },
+          {
+            "tp": "List",
+            "param": {
+              "tp": "Type",
+              "b": "A"
+            }
+          },
+          {
+            "tp": "List",
+            "param": {
+              "tp": "Type",
+              "b": "A"
+            }
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "tket.cell",
+              "extension_version": "0.1.0",
+              "id": "cell",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "G",
+              "input": [
+                {
+                  "t": "V",
+                  "i": 0,
+                  "b": "A"
+                },
+                {
+                  "t": "R",
+                  "i": 1,
+                  "b": "A"
+                }
+              ],
+              "output": [
+                {
+                  "t": "V",
+                  "i": 0,
+                  "b": "A"
+                },
+                {
+                  "t": "R",
+                  "i": 2,
+                  "b": "A"
+                }
+              ]
+            },
+            {
+              "t": "R",
+              "i": 1,
+              "b": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "tket.cell",
+              "extension_version": "0.1.0",
+              "id": "cell",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "R",
+              "i": 2,
+              "b": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "New": {
+      "extension": "tket.cell",
+      "name": "New",
+      "description": "Create a new cell from a value.",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "V",
+              "i": 0,
+              "b": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "tket.cell",
+              "extension_version": "0.1.0",
+              "id": "cell",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "Read": {
+      "extension": "tket.cell",
+      "name": "Read",
+      "description": "Copy the stored value and return the cell.",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "C"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "tket.cell",
+              "extension_version": "0.1.0",
+              "id": "cell",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "C"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "tket.cell",
+              "extension_version": "0.1.0",
+              "id": "cell",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "C"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "V",
+              "i": 0,
+              "b": "C"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "Swap": {
+      "extension": "tket.cell",
+      "name": "Swap",
+      "description": "Exchange the stored value, returning the cell and old value.",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "tket.cell",
+              "extension_version": "0.1.0",
+              "id": "cell",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "V",
+              "i": 0,
+              "b": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "tket.cell",
+              "extension_version": "0.1.0",
+              "id": "cell",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "V",
+              "i": 0,
+              "b": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "Write": {
+      "extension": "tket.cell",
+      "name": "Write",
+      "description": "Replace a copyable stored value and return the cell.",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "C"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "tket.cell",
+              "extension_version": "0.1.0",
+              "id": "cell",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "C"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "V",
+              "i": 0,
+              "b": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "tket.cell",
+              "extension_version": "0.1.0",
+              "id": "cell",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "C"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    }
+  }
+}

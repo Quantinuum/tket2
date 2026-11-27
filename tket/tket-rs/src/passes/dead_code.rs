@@ -1,11 +1,13 @@
 //! Pass for removing dead code, i.e. that computes values that are then discarded
 
+use hugr_core::extension::simple_op::MakeOpDef;
 use hugr_core::hugr::internal::HugrInternals;
 use hugr_core::{HugrView, Node, hugr::hugrmut::HugrMut, ops::OpType};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 
+use crate::extension::cell;
 use crate::passes::composable::WithScope;
 use crate::passes::{ComposablePass, PassScope};
 
@@ -75,13 +77,28 @@ impl PreserveNode {
     /// A conservative default for a given node. Just examines the node's [`OpType`]:
     /// * Assumes all Calls must be preserved. (One could scan the called `FuncDefn`, but would
     ///   also need to check for cycles in the [`ModuleGraph`](hugr_core::module_graph::ModuleGraph).)
+    /// * Preserves `tket.cell.Map` because its callback may have observable effects.
     /// * Assumes all CFGs must be preserved. (One could, for example, allow acyclic
     ///   CFGs to be removed.)
     /// * Assumes all `TailLoops` must be preserved. (One could, for example, use dataflow
     ///   analysis to allow removal of `TailLoops` that never [Continue](hugr_core::ops::TailLoop::CONTINUE_TAG).)
     pub fn default_for<H: HugrView>(h: &H, n: H::Node) -> PreserveNode {
         match h.get_optype(n) {
-            OpType::CFG(_) | OpType::TailLoop(_) | OpType::Call(_) => PreserveNode::MustKeep,
+            OpType::CFG(_) | OpType::TailLoop(_) => PreserveNode::MustKeep,
+            op => Self::ignoring_termination(op),
+        }
+    }
+
+    /// Calls can have observable effects even when their results are unused.
+    pub(super) fn ignoring_termination(op: &OpType) -> Self {
+        match op {
+            OpType::Call(_) | OpType::CallIndirect(_) => Self::MustKeep,
+            OpType::ExtensionOp(op)
+                if op.extension_id() == &cell::EXTENSION_ID
+                    && cell::CellOpDef::from_def(op.def()) == Ok(cell::CellOpDef::Map) =>
+            {
+                Self::MustKeep
+            }
             _ => Self::DeferToChildren,
         }
     }
@@ -418,6 +435,58 @@ mod test {
             ext_ops.sorted().collect_vec(),
             ["gate", "gate", "measure", "new"]
         );
+    }
+
+    #[rstest::rstest]
+    #[case::dce(DeadCodeElimPass::default())]
+    #[case::constant_fold(crate::passes::ConstantFoldPass::default())]
+    #[case::increase_termination(crate::passes::ConstantFoldPass::default().allow_increase_termination())]
+    fn preserve_cell_map_callback(#[case] pass: impl ComposablePass<Hugr>) {
+        use crate::extension::cell::CellOpBuilder;
+        use hugr_core::Visibility;
+        use hugr_core::builder::ModuleBuilder;
+        use hugr_core::ops::CallIndirect;
+        use hugr_core::types::{FuncValueType, Type};
+
+        let callback = Type::new_function(FuncValueType::new([bool_t()], [bool_t()]));
+        let sig = Signature::new([callback, bool_t()], vec![]);
+        let mut module = ModuleBuilder::new();
+        let mut helper = module.define_function("helper", sig.clone()).unwrap();
+        let inputs = helper.input_wires_arr::<2>();
+        let mut nested = helper.dfg_builder(sig.clone(), inputs).unwrap();
+        let [callback, value] = nested.input_wires_arr();
+
+        let cell = nested.add_new_cell(value).unwrap();
+        let (mapped, _) = nested
+            .add_map_cell(cell, callback, bool_t(), [], vec![])
+            .unwrap();
+        nested.add_free_cell(mapped, bool_t()).unwrap();
+        let unused = nested.add_new_cell(value).unwrap();
+        nested.add_free_cell(unused, bool_t()).unwrap();
+        nested.finish_with_outputs([]).unwrap();
+
+        let helper = helper.finish_with_outputs([]).unwrap();
+        let mut main = module
+            .define_function_vis("main", sig.clone(), Visibility::Public)
+            .unwrap();
+        let inputs = main.input_wires_arr::<2>();
+        let direct = main.call(helper.handle(), &[], inputs).unwrap();
+        let function = main.load_func(helper.handle(), &[]).unwrap();
+        let indirect = main
+            .add_dataflow_op(
+                CallIndirect { signature: sig },
+                [function, inputs[0], inputs[1]],
+            )
+            .unwrap();
+        main.finish_with_outputs([]).unwrap();
+
+        let mut hugr = module.finish_hugr().unwrap();
+        pass.run(&mut hugr).unwrap();
+        hugr.validate().unwrap();
+        assert!(hugr.contains_node(direct.node()));
+        assert!(hugr.contains_node(indirect.node()));
+        assert!(hugr.contains_node(mapped.node()));
+        assert!(!hugr.contains_node(unused.node()));
     }
 
     #[test]

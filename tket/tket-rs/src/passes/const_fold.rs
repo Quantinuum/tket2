@@ -195,7 +195,7 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
         let dce = DeadCodeElimPass::<H>::default_with_scope(self.scope.clone());
         dce.with_entry_points(self.inputs.keys().copied())
             .set_preserve_callback(if self.allow_increase_termination {
-                Arc::new(|_, _| PreserveNode::CanRemoveIgnoringChildren)
+                Arc::new(|h, n| PreserveNode::ignoring_termination(h.get_optype(n)))
             } else {
                 Arc::new(move |h, n| {
                     if terminating_tail_loops.contains(&n) {
