@@ -237,7 +237,7 @@
     "Map": {
       "extension": "tket.cell",
       "name": "Map",
-      "description": "Apply a function to the stored value and extra inputs, replacing the stored value and returning the cell and extra outputs.",
+      "description": "Apply a function to the stored value and extra inputs, install its replacement, and return the cell and extra outputs. The callback has exclusive access to the payload. Reentrant payload access through an alias must trap.",
       "signature": {
         "params": [
           {

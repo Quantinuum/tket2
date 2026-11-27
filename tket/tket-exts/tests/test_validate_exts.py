@@ -3,9 +3,55 @@ from collections.abc import Callable
 
 import pytest
 import tket_exts
+from hugr.build import Dfg
+from hugr.cli import validate
 from hugr.ops import ExtOp
-from hugr.tys import Bool, ExtType, FunctionType, Qubit
+from hugr.tys import Bool, ExtType, FunctionType, ListArg, Option, Qubit
 from tket_exts.tket._util import TketExtension
+
+
+def ext_cell() -> tuple[TketExtension, list[ExtType], list[ExtOp]]:
+    ext = tket_exts.cell
+    get_op = ext().get_op
+    handle = ext.cell_t(Qubit)
+    bit_cell = ext.cell_t(Bool)
+    qubit = [Qubit.type_arg()]
+    bit = [Bool.type_arg()]
+    callback = FunctionType([Qubit, Bool], [Qubit, Bool, Qubit])
+    return (
+        ext,
+        [handle],
+        [
+            get_op("New").instantiate(qubit, FunctionType([Qubit], [handle])),
+            get_op("Read").instantiate(bit, FunctionType([bit_cell], [bit_cell, Bool])),
+            get_op("Write").instantiate(
+                bit, FunctionType([bit_cell, Bool], [bit_cell])
+            ),
+            get_op("Swap").instantiate(
+                qubit, FunctionType([handle, Qubit], [handle, Qubit])
+            ),
+            get_op("Dup").instantiate(qubit, FunctionType([handle], [handle, handle])),
+            get_op("Eq").instantiate(
+                qubit, FunctionType([handle, handle], [handle, handle, Bool])
+            ),
+            get_op("Free").instantiate(qubit, FunctionType([handle], [Option(Qubit)])),
+            get_op("Map").instantiate(
+                [
+                    Qubit.type_arg(),
+                    ListArg([Bool.type_arg()]),
+                    ListArg([Bool.type_arg(), Qubit.type_arg()]),
+                ],
+                FunctionType([handle, callback, Bool], [handle, Bool, Qubit]),
+            ),
+        ],
+    )
+
+
+@pytest.mark.parametrize("op", ext_cell()[2], ids=lambda op: op.op_def().name)
+def test_cell_signature(op: ExtOp) -> None:
+    graph = Dfg(*op.outer_signature().input)
+    graph.set_outputs(*graph.add_op(op, *graph.inputs()))
+    validate(graph.hugr.to_package().to_bytes())
 
 
 def ext_debug() -> tuple[TketExtension, list[ExtType], list[ExtOp]]:
@@ -245,6 +291,7 @@ def ext_argument() -> tuple[TketExtension, list[ExtType], list[ExtOp]]:
 @pytest.mark.parametrize(
     "ext_vals",
     [
+        ext_cell,
         ext_debug,
         ext_gpu,
         ext_guppy,

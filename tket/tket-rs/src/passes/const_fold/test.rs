@@ -1826,7 +1826,7 @@ fn two_funcs_check_main_fully_folded(hugr: &Hugr, main: Node) {
         &int_cst(3 + 5 + 7 + 11)
     );
 
-    // The call is unused, but not removable since we don't allow_increase_termination
+    // The return value was folded. The call may still have effects.
     let call = hugr
         .children(main)
         .filter(|n| hugr.get_optype(*n).is_call())

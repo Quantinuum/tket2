@@ -1,6 +1,6 @@
 //! This module defines the Hugr extensions used to represent circuits.
 //!
-//! This includes a extension for the opaque TKET1 operations.
+//! This includes an extension for the opaque TKET1 operations.
 
 use std::sync::Arc;
 
@@ -18,6 +18,7 @@ use hugr::types::{PolyFuncType, PolyFuncTypeRV};
 use lazy_static::lazy_static;
 use smol_str::SmolStr;
 
+/// Definition for cell ops.
 pub mod cell;
 /// Definition for debug ops.
 pub mod debug;

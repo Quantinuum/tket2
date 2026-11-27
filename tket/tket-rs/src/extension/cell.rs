@@ -8,8 +8,10 @@
 //!
 //! `Map` gives its callback exclusive access to the payload. The callback returns
 //! the replacement payload followed by its results. The operation installs the
-//! replacement and returns the handle followed by those results. Backends that
-//! execute aliases concurrently must synchronize access to the shared storage.
+//! replacement and returns the handle followed by those results. If the callback
+//! directly or indirectly executes `Read`, `Write`, `Swap`, or another `Map` on
+//! an alias of this cell, execution must trap. Independent concurrent accesses
+//! to the payload must synchronize with the entire callback and replacement.
 //!
 //! Passing the returned handle to the next operation orders their execution.
 //! After [`CellOpDef::Dup`], operations on separate handles have unspecified
@@ -142,7 +144,7 @@ impl MakeOpDef for CellOpDef {
             CellOpDef::Dup => "Return two handles to the same cell without copying the stored value.".into(),
             CellOpDef::Eq => "Compare cell identity without reading the stored values, returning both handles in input order and a boolean.".into(),
             CellOpDef::Free => "Release a handle, returning Some(value) for the last handle and None otherwise.".into(),
-            CellOpDef::Map => "Apply a function to the stored value and extra inputs, replacing the stored value and returning the cell and extra outputs.".into(),
+            CellOpDef::Map => "Apply a function to the stored value and extra inputs, install its replacement, and return the cell and extra outputs. The callback has exclusive access to the payload. Reentrant payload access through an alias must trap.".into(),
         }
     }
 }
