@@ -226,6 +226,12 @@ fn mapped(reenter: bool) -> Hugr {
                 .unwrap();
             let a = b.add_free_cell(p, ty.clone()).unwrap();
             let last = b.add_free_cell(extras[0], ty.clone()).unwrap();
+            if reenter {
+                // Both Free results are unused. Preparation must still run the
+                // Map callback and report its reentrant access at runtime.
+                let ok = b.add_load_value(hugr::ops::Value::true_val());
+                return b.finish_hugr_with_outputs([ok]).unwrap();
+            }
             b.set_order(&a.node(), &last.node());
             let [value] = b.build_unwrap_sum(1, option_type([ty]), last).unwrap();
             let expected = b.add_load_value(ConstInt::new_u(6, 42).unwrap());
