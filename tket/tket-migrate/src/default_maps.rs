@@ -187,7 +187,7 @@ fn get_bool_const_map() -> ConstMapping {
         } else if let Some(b) = value.value().downcast_ref::<CustomSerialized>() {
             b.clone()
                 .try_into_custom_const::<ConstBool>()
-                .expect(&format!("bad CustomSerialized bool: {b:?}"))
+                .unwrap_or_else(|_| panic!("bad CustomSerialized bool: {b:?}"))
         } else {
             panic!("Unsupported bool constant {value:?}")
         };
