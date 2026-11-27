@@ -173,7 +173,7 @@ fn extension() -> Arc<Extension> {
     })
 }
 
-/// Reference to the cell Extension.
+/// Reference to the cell extension.
 pub static EXTENSION: LazyLock<Arc<Extension>> = LazyLock::new(extension);
 
 /// Construct a cell type without initializing the extension recursively.

@@ -57,7 +57,7 @@ __all__ = [
     "wasm",
 ]
 
-cell: CellExtension = CellExtension()
+cell: CellExtension = tket.cell.CellExtension()
 debug: DebugExtension = tket.debug.DebugExtension()
 gpu: GpuExtension = tket.gpu.GpuExtension()
 guppy: GuppyExtension = tket.guppy.GuppyExtension()
@@ -91,7 +91,7 @@ def tket_registry() -> ExtensionRegistry:
         An ExtensionRegistry containing all the tket extensions.
     """
     tket_exts: list[Callable[[], Extension]] = [
-        cell,
+        tket.cell.CellExtension(),
         tket.debug.DebugExtension(),
         tket.gpu.GpuExtension(),
         tket.guppy.GuppyExtension(),
