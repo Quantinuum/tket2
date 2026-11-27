@@ -1,6 +1,6 @@
 [package]
 name = "tket-qsystem"
-version = "0.30.1"
+version = "0.30.2"
 edition.workspace = true
 rust-version.workspace = true
 
@@ -22,7 +22,7 @@ name = "tket-qsystem"
 required-features = ["cli"]
 
 [dependencies]
-tket = { path = "../tket-rs", version = "0.23.1" }
+tket = { path = "../tket-rs", version = "0.23.2" }
 
 hugr.workspace = true
 hugr-core.workspace = true

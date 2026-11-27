@@ -1,6 +1,16 @@
 # Changelog
 
 
+## [0.23.2](https://github.com/Quantinuum/tket2/compare/tket-v0.23.1...tket-v0.23.2) - 2026-11-27
+
+### Bug Fixes
+
+- added support for SetBits and generalised BarrierContent struct ([#2125](https://github.com/Quantinuum/tket2/pull/2125))
+
+### New Features
+
+- Add a migration crate ([#2066](https://github.com/Quantinuum/tket2/pull/2066))
+
 ## [0.23.1](https://github.com/Quantinuum/tket2/compare/tket-v0.23.0...tket-v0.23.1) - 2026-11-24
 
 This release adds support for the `power` modifier, improves global phase handling
