@@ -16,7 +16,7 @@ use thiserror::Error;
 use hugr_core::builder::{
     BuildError, BuildHandle, Container, Dataflow, DataflowHugr, FunctionBuilder,
 };
-use hugr_core::extension::{ExtensionId, OpDef, SignatureError, TypeDef};
+use hugr_core::extension::{ExtensionId, OpDef, SignatureError, TypeDef, Version};
 use hugr_core::hugr::hugrmut::HugrMut;
 use hugr_core::hugr::internal::HugrMutInternals;
 use hugr_core::ops::constant::{OpaqueValue, Sum};
@@ -343,6 +343,7 @@ pub struct ReplaceTypes {
     param_types:
         HashMap<ParametricType, (Arc<dyn Fn(&[TypeArg]) -> Option<Type>>, ReplacementOptions)>,
     linearize: DelegatingLinearizer,
+    match_op_versions: bool,
     op_map: HashMap<OpHashWrapper, (NodeTemplate, ReplacementOptions)>,
     generated_ops: IndexSet<OpHashWrapper>,
     param_ops: HashMap<
@@ -371,12 +372,7 @@ pub struct ReplaceTypes {
 
 impl Default for ReplaceTypes {
     fn default() -> Self {
-        let mut res = Self::new_empty();
-        res.linearize = DelegatingLinearizer::default();
-        res.meta_policy = MetadataPropagationPolicy::default();
-        res.replace_consts_parametrized(array_type_def(), handlers::array_const);
-        res.replace_consts_parametrized(list_type_def(), list_const);
-        res
+        Self::new_with_op_version_matching(false)
     }
 }
 
@@ -422,6 +418,24 @@ pub enum ReplaceTypesError {
 }
 
 impl ReplaceTypes {
+    /// Creates a pass with the default handlers and configures how operation replacements match.
+    ///
+    /// By default, operations with the same qualified name match across extension versions.
+    /// Set `match_op_versions` to `true` to require the source extension version to match
+    /// for both concrete and parameterized operation replacements.
+    #[must_use]
+    pub fn new_with_op_version_matching(match_op_versions: bool) -> Self {
+        let mut res = Self {
+            match_op_versions,
+            linearize: DelegatingLinearizer::default(),
+            meta_policy: MetadataPropagationPolicy::default(),
+            ..Self::new_empty()
+        };
+        res.replace_consts_parametrized(array_type_def(), handlers::array_const);
+        res.replace_consts_parametrized(list_type_def(), list_const);
+        res
+    }
+
     /// Makes a new instance. Unlike [`Self::default`], this does not understand
     /// any extension types, even those in the prelude.
     #[must_use]
@@ -430,6 +444,7 @@ impl ReplaceTypes {
             type_map: Default::default(),
             param_types: Default::default(),
             linearize: DelegatingLinearizer::new_empty(),
+            match_op_versions: false,
             op_map: Default::default(),
             generated_ops: Default::default(),
             param_ops: Default::default(),
@@ -564,7 +579,7 @@ impl ReplaceTypes {
     /// Hugrs, as substitution (parametric polymorphism) happening later will not respect
     /// this replacement.
     pub fn set_replace_op(&mut self, src: &ExtensionOp, dest: NodeTemplate) {
-        let key = OpHashWrapper::from(src);
+        let key = OpHashWrapper::new(src, self.match_op_versions);
         self.generated_ops.swap_remove(&key);
         self.op_map
             .insert(key, (dest, ReplacementOptions::recursive()));
@@ -575,7 +590,8 @@ impl ReplaceTypes {
     pub(crate) fn set_replace_generated_op(&mut self, src: &ExtensionOp, dest: NodeTemplate) {
         assert!(matches!(dest, NodeTemplate::LinkedHugr(..)));
         self.set_replace_op(src, dest);
-        self.generated_ops.insert(src.into());
+        self.generated_ops
+            .insert(OpHashWrapper::new(src, self.match_op_versions));
     }
 
     /// Reserve declarations, renaming conflicting definitions in generated templates.
@@ -647,7 +663,7 @@ impl ReplaceTypes {
         + 'static,
     ) {
         self.param_ops.insert(
-            src.into(),
+            ParametricOp::new(src, self.match_op_versions),
             (Arc::new(dest_fn), ReplacementOptions::recursive()),
         );
     }
@@ -792,12 +808,14 @@ impl ReplaceTypes {
             OpType::ExtensionOp(ext_op) => Ok({
                 let def = ext_op.def_arc();
                 let mut changed = false;
-                let replacement = match self.op_map.get(&OpHashWrapper::from(&*ext_op)) {
+                let key = OpHashWrapper::new(ext_op, self.match_op_versions);
+                let replacement = match self.op_map.get(&key) {
                     r @ Some(_) => r.cloned(),
                     None => {
                         let mut args = ext_op.args().to_vec();
                         changed = args.transform(self)?;
-                        let r2 = match self.param_ops.get(&def.as_ref().into()) {
+                        let key = ParametricOp::new(def, self.match_op_versions);
+                        let r2 = match self.param_ops.get(&key) {
                             None => None,
                             Some((rep_fn, opts)) => {
                                 rep_fn(&args, self)?.map(|nt| (nt, opts.clone()))
@@ -920,13 +938,15 @@ pub mod handlers;
 #[derive(Clone, Hash, PartialEq, Eq)]
 struct OpHashWrapper {
     op_name: String, // Only because SmolStr not in hugr-passes yet
+    extension_version: Option<Version>,
     args: Vec<TypeArg>,
 }
 
-impl From<&ExtensionOp> for OpHashWrapper {
-    fn from(op: &ExtensionOp) -> Self {
+impl OpHashWrapper {
+    fn new(op: &ExtensionOp, match_version: bool) -> Self {
         Self {
             op_name: op.qualified_id().to_string(),
+            extension_version: match_version.then(|| op.extension_version()),
             args: op.args().to_vec(),
         }
     }
@@ -949,11 +969,15 @@ impl From<&CustomType> for ParametricType {
 
 // Separate from above for clarity
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-struct ParametricOp(ExtensionId, String);
+struct ParametricOp(ExtensionId, Option<Version>, String);
 
-impl From<&OpDef> for ParametricOp {
-    fn from(value: &OpDef) -> Self {
-        Self(value.extension_id().clone(), value.name().to_string())
+impl ParametricOp {
+    fn new(value: &OpDef, match_version: bool) -> Self {
+        Self(
+            value.extension_id().clone(),
+            match_version.then(|| value.extension_version()),
+            value.name().to_string(),
+        )
     }
 }
 

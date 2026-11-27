@@ -2901,6 +2901,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "tket-migrate"
+version = "0.1.0"
+dependencies = [
+ "hugr",
+ "hugr-core",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tket",
+ "typetag",
+]
+
+[[package]]
 name = "tket-py"
 version = "0.0.0"
 dependencies = [
